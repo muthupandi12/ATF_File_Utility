@@ -181,10 +181,7 @@ public class ReportUtil {
         logger.info("Creating CSV File -----{}", fileSheet);
         try {
             //creating csv file
-
-            FileWriter fileWriter = new FileWriter(file);
-//            log.info("File Writer ---{}", fileWriter);
-            CSVWriter csvWriter = new CSVWriter(fileWriter);
+            CSVWriter csvWriter = new CSVWriter(new FileWriter(file),',',CSVWriter.NO_QUOTE_CHARACTER);
             csvWriter.writeNext(txnFileHeader);
 //            log.info("Switch TXN CSV File Header Details ----{}", txnFileHeader);
             List<String[]> finalOut = new ArrayList<>();
@@ -213,7 +210,6 @@ public class ReportUtil {
             }
             csvWriter.writeAll(finalOut);
             csvWriter.close();
-            fileWriter.close();
             logger.info("CSV File Generated Successfully----!!!");
         } catch (IOException e) {
             e.printStackTrace();
@@ -226,9 +222,7 @@ public class ReportUtil {
         try {
             //creating csv file
 
-            FileWriter fileWriter = new FileWriter(file);
-//            log.info("File Writer ---{}", fileWriter);
-            CSVWriter csvWriter = new CSVWriter(fileWriter);
+            CSVWriter csvWriter = new CSVWriter(new FileWriter(file),',',CSVWriter.NO_QUOTE_CHARACTER);
             csvWriter.writeNext(txnFileHeader);
 //            log.info("Switch TXN CSV File Header Details ----{}", txnFileHeader);
             List<String[]> finalOut = new ArrayList<>();
@@ -267,7 +261,6 @@ public class ReportUtil {
             }
             csvWriter.writeAll(finalOut);
             csvWriter.close();
-            fileWriter.close();
             logger.info("AllAndSettlement Missing Data CSV File Generated Successfully----!!!");
         } catch (IOException e) {
             e.printStackTrace();

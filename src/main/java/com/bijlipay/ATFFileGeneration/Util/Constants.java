@@ -16,6 +16,9 @@ public class Constants {
 
     public static final String[] ATF_FILE_HEADER1 = {"transactionId"};
 
+    public static final String[] MISSING_TXN_HEADER = {"RRN"};
+
+
     public static final String Sale = "Sale";
 
     public static final String UPI = "UPI";
@@ -27,9 +30,15 @@ public class Constants {
 
     public static final String[] ATF_FILE_HEADER2 = {"transactionId","responseDateCheck","voidAndSaleTxnIdCheckWithDate","reversalAndSaleTxnIdCheckWithDate","voidTxnResponseCodeCheck","reversalAndAckStatus","settledTxnWrongStatus","notSettledTxnWrongStatus","voidTxnOtherThanHostStatus","saleUpiNullValueStatus","voidReversalNullValueStatus","upiAndReversalTxnIdEqualStatus","saleTxnOnlyInitStatus"};
 
-    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","sarvesh@bijlipay.co.in"};
+    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","sarvesh@bijlipay.co.in","ramalingom.sundaram@bijlipay.co.in"};
 
-    public static final String[] SENT_TOTAL_MAIL = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in"};
+//    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in"};
+
+
+    public static final String[] SENT_TOTAL_MAIL = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","selvamuthukumar@bijlipay.co.in"};
+
+//    public static final String[] SENT_TOTAL_MAIL = {"muthupandi@bijlipay.co.in"};
+
 
 
 

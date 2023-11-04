@@ -114,6 +114,13 @@ public class AtfFileReport {
 
     @Column(name = "only_void_reversal_without_sale_or_upi",columnDefinition = "tinyint(1) default 0")
     private boolean onlyVoidReversalWithoutSaleOrUPI;
+
+    @Column(name = "response_date_mismatch",columnDefinition = "tinyint(1) default 0")
+    private boolean responseDateMismatch;
+
+    @Column(name = "settled_txn_wrong_corresponding_void_or_reversal",columnDefinition = "tinyint(1) default 0")
+    private boolean settledTxnWrongCorrespondingVoidOrReversal;
+
     public long getId() {
         return id;
     }
@@ -481,5 +488,21 @@ public class AtfFileReport {
 
     public void setOnlyVoidReversalWithoutSaleOrUPI(boolean onlyVoidReversalWithoutSaleOrUPI) {
         this.onlyVoidReversalWithoutSaleOrUPI = onlyVoidReversalWithoutSaleOrUPI;
+    }
+
+    public boolean isResponseDateMismatch() {
+        return responseDateMismatch;
+    }
+
+    public void setResponseDateMismatch(boolean responseDateMismatch) {
+        this.responseDateMismatch = responseDateMismatch;
+    }
+
+    public boolean isSettledTxnWrongCorrespondingVoidOrReversal() {
+        return settledTxnWrongCorrespondingVoidOrReversal;
+    }
+
+    public void setSettledTxnWrongCorrespondingVoidOrReversal(boolean settledTxnWrongCorrespondingVoidOrReversal) {
+        this.settledTxnWrongCorrespondingVoidOrReversal = settledTxnWrongCorrespondingVoidOrReversal;
     }
 }

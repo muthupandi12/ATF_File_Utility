@@ -1,5 +1,7 @@
 package com.bijlipay.ATFFileGeneration.Util;
 
+import org.apache.commons.lang3.time.DateUtils;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -21,6 +23,13 @@ public class DateUtil {
         return currentDate;
     }
 
+    public static String allTxnDate2() {
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DATE, -2);
+        String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat);
+        return currentDate;
+    }
+
     public static String previousDate() {
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.DATE, -1);
@@ -35,13 +44,23 @@ public class DateUtil {
     }
 
 
-    public static String parseSimpleDate(Date date) throws ParseException {
-        SimpleDateFormat dateFormatter = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
-        return dateFormatter.format(date);
-    }
+//    public static String parseSimpleDate(Date date) throws ParseException {
+//        SimpleDateFormat dateFormatter = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
+//        return dateFormatter.format(date);
+//    }
 
     public static String parseSimpleDateForRules(Date date) throws ParseException {
         SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+        return dateFormatter.format(date);
+    }
+
+    public static String dateToString(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        return dateFormatter.format(date);
+    }
+
+    public static String dateComparison(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM");
         return dateFormatter.format(date);
     }
 
@@ -66,5 +85,16 @@ public class DateUtil {
         Date date = new Date();
         String currentDate = formatter.format(date);
         return currentDate;
+    }
+
+    public static Date currentDate() {
+        Date date = new Date();
+        return date;
+    }
+
+
+    public static Date oneHourBeforeDate(Date date){
+        Date newDate = DateUtils.addHours(date, -2);
+        return newDate;
     }
 }

@@ -37,26 +37,42 @@ public class AtfFileController {
     @GetMapping("/upload-atf-file")
     public void uploadAtfFile() throws Exception {
         String allTxnDate = DateUtil.allTxnDate();
+        String currentDate = DateUtil.currentDate1();
         boolean allTxnFileUpdated = false;
-        String atfFile = atfFileReportPath + "All_Txn_File-" + allTxnDate + ".csv";
+        boolean txnListBefore = false;
+        boolean txnListAfter = false;
+//        String atfFile = atfFileReportPath + "All_Txn_File-" + allTxnDate + ".csv";
 
-//        String atfFile = atfFileReportPath + "All_Txn_File-Testing.csv";
+//        String atfFile = atfFileReportPath + "All_Txn_File-2023-10-31.csv";
+        String atfFile = atfFileReportPath + "SettledTxnChecking.csv";
 
 
-//        String atfFile = atfFileReportPath + "ATF_Null_Final_Testing.csv";
+        String missingTxnBefore = atfFileReportPath + "TransactionList_"+ allTxnDate + ".csv";
+        String missingTxnAfter = atfFileReportPath + "TransactionList_"+ currentDate + ".csv";
+
+//        String missingTxnBefore = atfFileReportPath + "TransactionList_2023-10-14.csv";
+//        String missingTxnAfter = atfFileReportPath + "TransactionList_2023-10-15.csv";
 
         try {
             allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+//            txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
+//            txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
             if (allTxnFileUpdated) {
                 logger.info("All Txn File Data inserted in db Successfully----{}", atfFile);
             }
-
+            if (txnListBefore) {
+                logger.info("Txn List File Before Data inserted in db Successfully----{}", missingTxnBefore);
+            }
+            if (txnListAfter) {
+                logger.info("Txn List File After Data inserted in db Successfully----{}", missingTxnAfter);
+            }
 
             List<AtfFileReport> atfFileReports =atfFileService.updateDataBasedOnTransId();
             logger.info("Atf File All Rules Updated Successfully");
 
             atfFileService.generateAtfFileReport();
-            mailHandler.sendMail();
+//            atfFileService.generateMissingATFFileTxn();
+//            mailHandler.sendMail();
             logger.info("Mail Send Successfully....");
 //            Boolean remove =atfFileService.removeDataInDB();
 //            if(remove){

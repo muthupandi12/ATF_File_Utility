@@ -37,6 +37,9 @@ public interface AtfFileService {
 
     void generateTxnAndSettlementMissingFile();
 
+    boolean updateTxnListTotalData(String missingTxnBefore);
+
+    void generateMissingATFFileTxn() throws IOException;
 }
 
 

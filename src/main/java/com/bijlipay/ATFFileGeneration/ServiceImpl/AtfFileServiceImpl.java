@@ -1,22 +1,21 @@
 package com.bijlipay.ATFFileGeneration.ServiceImpl;
 
 import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
+import com.bijlipay.ATFFileGeneration.Model.TxnListMainTotal;
 import com.bijlipay.ATFFileGeneration.Model.SettlementFile;
 import com.bijlipay.ATFFileGeneration.Model.TransactionList;
 import com.bijlipay.ATFFileGeneration.Repository.AtfFileRepository;
 import com.bijlipay.ATFFileGeneration.Repository.SettlementFileRepository;
 import com.bijlipay.ATFFileGeneration.Repository.TransactionListRepository;
+import com.bijlipay.ATFFileGeneration.Repository.TxnListMainTotalRepository;
 import com.bijlipay.ATFFileGeneration.Service.AtfFileService;
 import com.bijlipay.ATFFileGeneration.Util.Constants;
 import com.bijlipay.ATFFileGeneration.Util.DateUtil;
 import com.bijlipay.ATFFileGeneration.Util.ReportUtil;
-import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -26,7 +25,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +43,9 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Autowired
     private TransactionListRepository transactionListRepository;
+
+    @Autowired
+    private TxnListMainTotalRepository txnListMainTotalRepository;
 
     @Value("${atf.file.updated.path}")
     private String updatedAtfFilePath;
@@ -146,7 +147,7 @@ public class AtfFileServiceImpl implements AtfFileService {
         String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
         String atfFileSheet = "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
         List<Object[]> atf = null;
-        for (int i = 0; i < 14; i++) {
+        for (int i = 0; i < 16; i++) {
             String[] addressesArr = new String[1];
             if (i == 0) {
                 addressesArr[0] = "Rule 1- SALE & UPI & VOID & Reversal ResponseDate lesser than transactionDate";
@@ -163,27 +164,27 @@ public class AtfFileServiceImpl implements AtfFileService {
                 addressesArr[0] = "Rule 4- VOID and Reversal should have the following fields  - Masked card number, Card holder name ,RRN, AuthCode, responseCode, transactionDate, responseDate, Stan, MID, TID, PosDeviceID, Invoice No, batch No, amount, txntype, TransactionID, OrginalTransactionID";
                 atf = atfFileRepository.findByAtfFileDataRule4();
             } else if (i == 4) {
-                addressesArr[0] = "Rule 5- VOID txns OrginalTransactionID should not match with a SALE Txn ID in same file with same date";
+                addressesArr[0] = "Rule 5- VOID txns OriginalTransactionID should not match with a SALE Txn ID in same file with different date";
                 atf = atfFileRepository.findByAtfFileDataRule5();
             } else if (i == 5) {
-                addressesArr[0] = "Rule 6- SALE Reversal txns OrginalTransactionID  & Txn ID should not match with a SALE Txn ID in same file with same date";
+                addressesArr[0] = "Rule 6- SALE Reversal txns OriginalTransactionID  & Txn ID should not match with a SALE Txn ID in same file with different date";
                 atf = atfFileRepository.findByAtfFileDataRule6();
 
             } else if (i == 6) {
-                addressesArr[0] = "Rule 7- UPI txns Txn ID should not match with a Reversal OrginalTransactionID in same file";
+                addressesArr[0] = "Rule 7- UPI txns Txn ID should match with a Reversal OriginalTransactionID in same file";
                 atf = atfFileRepository.findByAtfFileDataRule7();
 
             } else if (i == 7) {
-                addressesArr[0] = "Rule 8- Reversals corresponding SALE/ UPI transaction can be in ACK status";
+                addressesArr[0] = "Rule 8- Reversals corresponding SALE/ UPI transaction in ACK status";
                 atf = atfFileRepository.findByAtfFileDataRule8();
             } else if (i == 8) {
-                addressesArr[0] = "Rule 9- VOID transactions orginal txn should not be in ACK or HOST with responsecode 00";
+                addressesArr[0] = "Rule 9- VOID transactions original txn should not be in ACK or HOST with responsecode 00";
                 atf = atfFileRepository.findByAtfFileDataRule9();
             } else if (i == 9) {
                 addressesArr[0] = "Rule 10- VOID transaction status other than HOST";
                 atf = atfFileRepository.findByAtfFileDataRule10();
             } else if (i == 10) {
-                addressesArr[0] = "Rule 11- SALE and UPI transactions marked as Settled but not with ACK or HOST with responsecode 00";
+                addressesArr[0] = "Rule 11- SALE and UPI transactions marked as Not Settled corresponding ACK or HOST with responsecode 00";
                 atf = atfFileRepository.findByAtfFileDataRule11();
             } else if (i == 11) {
                 addressesArr[0] = "Rule 12- SALE and UPI transactions with ACK or HOST with responsecode 00 but not marked as settled with no corresponding VOID or Reversal";
@@ -194,6 +195,12 @@ public class AtfFileServiceImpl implements AtfFileService {
             } else if (i == 13) {
                 addressesArr[0] = "Rule 14- VOID or Reversal entry only available without corresponding SALE and UPI transactions";
                 atf = atfFileRepository.findByAtfFileDataRule14();
+            } else if (i == 14) {
+                addressesArr[0] = "Rule 15- Response Date and Transaction Date Year MisMatch Data";
+                atf = atfFileRepository.findByAtfFileDataRule15();
+            } else if (i == 15) {
+                addressesArr[0] = "Rule 16- SALE and UPI transactions with ACK or HOST with responsecode 00 but marked as not settled with corresponding VOID or Reversal in transactionDate before 23:00:00";
+                atf = atfFileRepository.findByAtfFileDataRule16();
             }
 //            ReportUtil.generateAtfFileDataDummy(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
             ReportUtil.generateAtfFileReportInTextFile(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
@@ -223,14 +230,21 @@ public class AtfFileServiceImpl implements AtfFileService {
     @Override
     public List<AtfFileReport> updateDataBasedOnTransId() {
         List<String> transactionId = atfFileRepository.findAllTransId();
+        List<String> voidOrReversalCase = atfFileRepository.findAllTransIdForVoidOrReversal();
         logger.info("Transaction Id List Size --{}", transactionId.size());
+        logger.info("Void Or Reversal Transaction Id List Size --{}", transactionId.size());
         int count = 0;
         for (int i = 0; i < transactionId.size(); i += 500) {
             count++;
             List<String> sub = transactionId.subList(i, Math.min(transactionId.size(), i + 500));
-//            logger.info("Transaction Id Size for Every Loop --{}--------{}", sub.size(), sub.get(sub.size() - 1));
-            logger.info("Loop Count AND Last TransactionId--- {}---- {}", count,sub.get(sub.size() -1));
+            logger.info("Loop Count For Sale AND UPI with Last TransactionId--- {}---- {}", count, sub.get(sub.size() - 1));
             threadExecution(sub);
+        }
+        for (int i = 0; i < voidOrReversalCase.size(); i += 500) {
+            count++;
+            List<String> sub = voidOrReversalCase.subList(i, Math.min(voidOrReversalCase.size(), i + 500));
+            logger.info("Loop Count For Void AND Reversal with Last TransactionId--- {}---- {}", count, sub.get(sub.size() - 1));
+            threadExecution1(sub);
         }
         return null;
     }
@@ -252,7 +266,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                         if (update.get(0).getTransactionType().equals("Void")) {
                             if (update.get(1).getTransactionType().equals("Sale")) {
                                 try {
-                                    if (!((update.get(0).getOrgTransactionId().equals(update.get(1).getTransactionId())) && (DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
+                                    if ((update.get(0).getOrgTransactionId().equals(update.get(0).getTransactionId())) || (!(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
                                         logger.info(DOUBLE_VALUE + " Checking Void And Sale Original & Txn Id ---{}", update.get(0).getTransactionId());
                                         update.get(0).setVoidAndSaleTxnIdCheckWithDate(true);
                                         update.get(1).setVoidAndSaleTxnIdCheckWithDate(true);
@@ -265,7 +279,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                             if (update.get(1).getTransactionType().equals("Void")) {
                                 if (update.get(0).getTransactionType().equals("Sale")) {
                                     try {
-                                        if (!((update.get(1).getOrgTransactionId().equals(update.get(0).getTransactionId())) && (DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
+                                        if ((update.get(1).getOrgTransactionId().equals(update.get(1).getTransactionId())) || (!(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
                                             logger.info(DOUBLE_VALUE + " Checking Void And Sale Original & Txn Id ---{}", update.get(0).getTransactionId());
                                             update.get(0).setVoidAndSaleTxnIdCheckWithDate(true);
                                             update.get(1).setVoidAndSaleTxnIdCheckWithDate(true);
@@ -334,7 +348,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                         if (update.get(0).getTransactionType().equals("Reversal")) {
                             if (update.get(1).getTransactionType().equals("Sale")) {
                                 try {
-                                    if (!((update.get(0).getOrgTransactionId().equals(update.get(1).getTransactionId())) && (DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
+                                    if ((!(update.get(0).getOrgTransactionId().equals(update.get(0).getTransactionId()))) || (!(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
                                         logger.info(DOUBLE_VALUE + " Checking Reversal And Sale Original Txn Id ---{}", update.get(0).getTransactionId());
                                         update.get(0).setReversalAndSaleTxnIdCheckWithDate(true);
                                         update.get(1).setReversalAndSaleTxnIdCheckWithDate(true);
@@ -347,7 +361,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                             if (update.get(1).getTransactionType().equals("Reversal")) {
                                 if (update.get(0).getTransactionType().equals("Sale")) {
                                     try {
-                                        if (!((update.get(1).getOrgTransactionId().equals(update.get(0).getTransactionId())) && (DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
+                                        if ((!(update.get(1).getOrgTransactionId().equals(update.get(1).getTransactionId()))) || (!(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))))) {
                                             logger.info(DOUBLE_VALUE + " Checking Reversal And Sale Original Txn Id ---{}", update.get(0).getTransactionId());
                                             update.get(0).setReversalAndSaleTxnIdCheckWithDate(true);
                                             update.get(1).setReversalAndSaleTxnIdCheckWithDate(true);
@@ -374,58 +388,64 @@ public class AtfFileServiceImpl implements AtfFileService {
                             }
                         }
                         if (update.get(0).getTransactionType().equals("UPI")) {
-                            if (!(update.get(0).getTransactionId().equals(update.get(1).getOrgTransactionId()))) {
+                            if ((update.get(1).getTransactionId().equals(update.get(1).getOrgTransactionId()))) {
                                 logger.info(DOUBLE_VALUE + " UPI And Reversal Txn Id Equal Checking----{}", update.get(0).getTransactionId());
                                 update.get(0).setUpiAndReversalTxnIdEqualStatus(true);
                                 update.get(1).setUpiAndReversalTxnIdEqualStatus(true);
                             }
                         } else {
                             if (update.get(1).getTransactionType().equals("UPI")) {
-                                if (!(update.get(1).getTransactionId().equals(update.get(0).getOrgTransactionId()))) {
+                                if ((update.get(0).getTransactionId().equals(update.get(0).getOrgTransactionId()))) {
                                     logger.info(DOUBLE_VALUE + " UPI And Reversal Txn Id Equal Checking----{}", update.get(0).getTransactionId());
                                     update.get(0).setUpiAndReversalTxnIdEqualStatus(true);
                                     update.get(1).setUpiAndReversalTxnIdEqualStatus(true);
                                 }
                             }
                         }
-                        if (update.get(0).getTransactionType().equals("Reversal")) {
+                        if (update.get(0).getTransactionType().equals("Reversal") || update.get(0).getTransactionType().equals("Void")) {
                             try {
-                                if((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
+                                if ((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
                                     if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
-                                        if ((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("Settled")) {
+                                        if (((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("Settled")) || update.get(0).getSettlementStatus().equals("Settled")) {
                                             update.get(0).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
                                             update.get(1).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
                                         }
                                     }
-                                }else{
-                                    if(!(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
-                                        if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
-                                            if ((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("NotSettled")) {
-                                                update.get(0).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
-                                                update.get(1).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
+                                } else {
+                                    String oneHourDate = DateUtil.dateToString(update.get(1).getTransactionDate());
+                                    logger.info("One Hour Date --{}", oneHourDate);
+                                    logger.info("After One --{}",DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()));
+                                        if (update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()))) {
+                                            if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
+                                                if (((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("NotSettled")) || update.get(0).getSettlementStatus().equals("NotSettled")) {
+                                                    update.get(0).setSettledTxnWrongCorrespondingVoidOrReversal(true);
+                                                    update.get(1).setSettledTxnWrongCorrespondingVoidOrReversal(true);
+                                                }
                                             }
                                         }
                                     }
-                                }
                             } catch (ParseException e) {
                                 throw new RuntimeException(e);
                             }
                         } else {
-                            if (update.get(1).getTransactionType().equals("Reversal")) {
+                            if (update.get(1).getTransactionType().equals("Reversal") || update.get(1).getTransactionType().equals("Void")) {
                                 try {
-                                    if((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
+                                    if ((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
                                         if (update.get(0).getTransactionType().equals("Sale") || update.get(0).getTransactionType().equals("UPI")) {
-                                            if ((update.get(0).getStatus().equals("ACK") || update.get(0).getStatus().equals("HOST")) && update.get(0).getResponseCode().equals("00") && update.get(0).getSettlementStatus().equals("Settled")) {
+                                            if (((update.get(0).getStatus().equals("ACK") || update.get(0).getStatus().equals("HOST")) && update.get(0).getResponseCode().equals("00") && update.get(0).getSettlementStatus().equals("Settled")) || update.get(1).getSettlementStatus().equals("Settled")) {
                                                 update.get(0).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
                                                 update.get(1).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
                                             }
                                         }
-                                    }else{
-                                        if(!(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
+                                    } else {
+                                        String oneHourDate = DateUtil.dateToString(update.get(0).getTransactionDate());
+                                        logger.info("One Hour Date --{}",oneHourDate);
+                                        logger.info("After One --{}",(update.get(0).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(0).getTransactionDate()))));
+                                        if (update.get(0).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(0).getTransactionDate()))) {
                                             if (update.get(0).getTransactionType().equals("Sale") || update.get(0).getTransactionType().equals("UPI")) {
-                                                if ((update.get(0).getStatus().equals("ACK") || update.get(0).getStatus().equals("HOST")) && update.get(0).getResponseCode().equals("00") && update.get(0).getSettlementStatus().equals("NotSettled")) {
-                                                    update.get(0).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
-                                                    update.get(1).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
+                                                if (((update.get(0).getStatus().equals("ACK") || update.get(0).getStatus().equals("HOST")) && update.get(0).getResponseCode().equals("00") && update.get(0).getSettlementStatus().equals("NotSettled")) || update.get(1).getSettlementStatus().equals("NotSettled")) {
+                                                    update.get(0).setSettledTxnWrongCorrespondingVoidOrReversal(true);
+                                                    update.get(1).setSettledTxnWrongCorrespondingVoidOrReversal(true);
                                                 }
                                             }
                                         }
@@ -435,31 +455,21 @@ public class AtfFileServiceImpl implements AtfFileService {
                                 }
                             }
                         }
-
                     }
                     if (update.get(0).getTransactionType().equals("Reversal")) {
                         if ((update.get(0).getStatus().equals("INIT"))) {
-                            if(update.get(1).getTransactionType().equals("Sale")) {
-//                                if(update.get(1).getResponseCode().equals("00")) {
-                                    if (((update.get(0).getMaskedCardNumber() == null) || (update.get(0).getCardHolderName() == null) || (update.get(0).getRrn() == null) || (update.get(0).getTransactionAuthCode() == null) || (update.get(0).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getStan() == null) || (update.get(0).getMerchantId() == null) || (update.get(0).getTerminalId() == null) || (update.get(0).getPosDeviceId() == null) || (update.get(0).getInvoiceNumber() == null) || (update.get(0).getBatchNumber() == null) || (update.get(0).getAmount() == null) || (update.get(0).getTransactionType() == null) || (update.get(0).getTransactionId() == null) || (update.get(0).getOrgTransactionId() == null)) ||
-                                            ((update.get(0).getMaskedCardNumber().equals("null")) || (update.get(0).getCardHolderName().equals("null")) || (update.get(0).getRrn().equals("null")) || (update.get(0).getTransactionAuthCode().equals("null")) || (update.get(0).getResponseCode().equals("null")) || (update.get(0).getTransactionDate().equals("null")) || (update.get(0).getResponseDate().equals("null")) || (update.get(0).getStan().equals("null")) || (update.get(0).getMerchantId().equals("null")) || (update.get(0).getTerminalId().equals("null")) || (update.get(0).getPosDeviceId().equals("null")) || (update.get(0).getInvoiceNumber().equals("null")) || (update.get(0).getBatchNumber().equals("null")) || (update.get(0).getAmount().equals("null")) || (update.get(0).getTransactionType().equals("null")) || (update.get(0).getTransactionId().equals("null")) || (update.get(0).getOrgTransactionId().equals("null"))) ||
-                                            ((update.get(0).getMaskedCardNumber().equals("")) || (update.get(0).getCardHolderName().equals("")) || (update.get(0).getRrn().equals("")) || (update.get(0).getTransactionAuthCode().equals("")) || (update.get(0).getResponseCode().equals("")) || (update.get(0).getTransactionDate().equals("")) || (update.get(0).getResponseDate().equals("")) || (update.get(0).getStan().equals("")) || (update.get(0).getMerchantId().equals("")) || (update.get(0).getTerminalId().equals("")) || (update.get(0).getPosDeviceId().equals("")) || (update.get(0).getInvoiceNumber().equals("")) || (update.get(0).getBatchNumber().equals("")) || (update.get(0).getAmount().equals("")) || (update.get(0).getTransactionType().equals("")) || (update.get(0).getTransactionId().equals("")) || (update.get(0).getOrgTransactionId().equals("")))) {
-                                        logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
-                                        update.get(0).setVoidReversalNullValueStatus(true);
-                                        update.get(1).setVoidReversalNullValueStatus(true);
-                                    }
-//                                }else{
-//                                    if ((update.get(0).getRrn() == null || update.get(0).getResponseCode() == null || update.get(0).getTransactionDate() == null || update.get(0).getResponseDate() == null || update.get(0).getStan() == null || update.get(0).getMerchantId() == null || update.get(0).getTerminalId() == null || update.get(0).getPosDeviceId() == null || update.get(0).getInvoiceNumber() == null || update.get(0).getBatchNumber() == null || update.get(0).getAmount() == null || update.get(0).getTransactionType() == null || update.get(0).getTransactionId() == null || update.get(0).getOrgTransactionId() == null) ||
-//                                            (update.get(0).getMaskedCardNumber().equals("null") || update.get(0).getCardHolderName().equals("null") || update.get(0).getRrn().equals("null") || update.get(0).getTransactionAuthCode().equals("null") || update.get(0).getResponseCode().equals("null") || update.get(0).getTransactionDate().equals("null") || update.get(0).getResponseDate().equals("null") || update.get(0).getStan().equals("null") || update.get(0).getMerchantId().equals("null") || update.get(0).getTerminalId().equals("null") || update.get(0).getPosDeviceId().equals("null") || update.get(0).getInvoiceNumber().equals("null") || update.get(0).getBatchNumber().equals("null") || update.get(0).getAmount().equals("null") || update.get(0).getTransactionType().equals("null") || update.get(0).getTransactionId().equals("null") || update.get(0).getOrgTransactionId().equals("null"))) {
-//                                        logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
-//                                        update.get(0).setVoidReversalNullValueStatus(true);
-//                                        update.get(1).setVoidReversalNullValueStatus(true);
-//                                    }
-//                                }
+                            if (update.get(1).getTransactionType().equals("Sale")) {
+                                if (((update.get(0).getMaskedCardNumber() == null) || (update.get(0).getCardHolderName() == null) || (update.get(0).getPosDeviceId() == null) || (update.get(0).getRrn() == null) || (update.get(0).getTransactionAuthCode() == null) || (update.get(0).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getStan() == null) || (update.get(0).getMerchantId() == null) || (update.get(0).getTerminalId() == null) || (update.get(0).getInvoiceNumber() == null) || (update.get(0).getBatchNumber() == null) || (update.get(0).getAmount() == null) || (update.get(0).getTransactionType() == null) || (update.get(0).getTransactionId() == null) || (update.get(0).getOrgTransactionId() == null)) ||
+                                        ((update.get(0).getMaskedCardNumber().equals("null")) || (update.get(0).getCardHolderName().equals("null")) || (update.get(0).getPosDeviceId().equals("null")) || (update.get(0).getRrn().equals("null")) || (update.get(0).getTransactionAuthCode().equals("null")) || (update.get(0).getResponseCode().equals("null")) || (update.get(0).getTransactionDate().equals("null")) || (update.get(0).getResponseDate().equals("null")) || (update.get(0).getStan().equals("null")) || (update.get(0).getMerchantId().equals("null")) || (update.get(0).getTerminalId().equals("null")) || (update.get(0).getInvoiceNumber().equals("null")) || (update.get(0).getBatchNumber().equals("null")) || (update.get(0).getAmount().equals("null")) || (update.get(0).getTransactionType().equals("null")) || (update.get(0).getTransactionId().equals("null")) || (update.get(0).getOrgTransactionId().equals("null"))) ||
+                                        ((update.get(0).getMaskedCardNumber().equals("")) || (update.get(0).getCardHolderName().equals("")) || (update.get(0).getRrn().equals("")) || (update.get(0).getPosDeviceId().equals("")) || (update.get(0).getTransactionAuthCode().equals("")) || (update.get(0).getResponseCode().equals("")) || (update.get(0).getTransactionDate().equals("")) || (update.get(0).getResponseDate().equals("")) || (update.get(0).getStan().equals("")) || (update.get(0).getMerchantId().equals("")) || (update.get(0).getTerminalId().equals("")) || (update.get(0).getInvoiceNumber().equals("")) || (update.get(0).getBatchNumber().equals("")) || (update.get(0).getAmount().equals("")) || (update.get(0).getTransactionType().equals("")) || (update.get(0).getTransactionId().equals("")) || (update.get(0).getOrgTransactionId().equals("")))) {
+                                    logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
+                                    update.get(0).setVoidReversalNullValueStatus(true);
+                                    update.get(1).setVoidReversalNullValueStatus(true);
+                                }
                             } else if (update.get(1).getTransactionType().equals("UPI")) {
-                                if (((update.get(0).getRrn() == null) || (update.get(0).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getStan() == null) || (update.get(0).getMerchantId() == null) || (update.get(0).getTerminalId() == null) || (update.get(0).getPosDeviceId() == null) || (update.get(0).getInvoiceNumber() == null) || (update.get(0).getBatchNumber() == null) || (update.get(0).getAmount() == null) || (update.get(0).getTransactionType() == null) || (update.get(0).getTransactionId() == null) || (update.get(0).getOrgTransactionId() == null)) ||
-                                        ((update.get(0).getRrn().equals("null")) || (update.get(0).getResponseCode().equals("null")) || (update.get(0).getTransactionDate().equals("null")) || (update.get(0).getResponseDate().equals("null")) || (update.get(0).getStan().equals("null")) || (update.get(0).getMerchantId().equals("null")) || (update.get(0).getTerminalId().equals("null")) || (update.get(0).getPosDeviceId().equals("null")) || (update.get(0).getInvoiceNumber().equals("null")) || (update.get(0).getBatchNumber().equals("null")) || (update.get(0).getAmount().equals("null")) || (update.get(0).getTransactionType().equals("null")) || (update.get(0).getTransactionId().equals("null")) || (update.get(0).getOrgTransactionId().equals("null"))) ||
-                                        ((update.get(0).getRrn().equals("")) || (update.get(0).getResponseCode().equals("")) || (update.get(0).getTransactionDate().equals("")) || (update.get(0).getResponseDate().equals("")) || (update.get(0).getStan().equals("")) || (update.get(0).getMerchantId().equals("")) || (update.get(0).getTerminalId().equals("")) || (update.get(0).getPosDeviceId().equals("")) || (update.get(0).getInvoiceNumber().equals("")) || (update.get(0).getBatchNumber().equals("")) || (update.get(0).getAmount().equals("")) || (update.get(0).getTransactionType().equals("")) || (update.get(0).getTransactionId().equals("")) || (update.get(0).getOrgTransactionId().equals("")))) {
+                                if (((update.get(0).getRrn() == null) || (update.get(0).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getStan() == null) || (update.get(0).getPosDeviceId() == null) || (update.get(0).getMerchantId() == null) || (update.get(0).getTerminalId() == null) || (update.get(0).getInvoiceNumber() == null) || (update.get(0).getBatchNumber() == null) || (update.get(0).getAmount() == null) || (update.get(0).getTransactionType() == null) || (update.get(0).getTransactionId() == null) || (update.get(0).getOrgTransactionId() == null)) ||
+                                        ((update.get(0).getRrn().equals("null")) || (update.get(0).getTransactionDate().equals("null")) || (update.get(0).getResponseDate().equals("null")) || (update.get(0).getStan().equals("null")) || (update.get(0).getPosDeviceId().equals("null")) || (update.get(0).getMerchantId().equals("null")) || (update.get(0).getTerminalId().equals("null")) || (update.get(0).getInvoiceNumber().equals("null")) || (update.get(0).getBatchNumber().equals("null")) || (update.get(0).getAmount().equals("null")) || (update.get(0).getTransactionType().equals("null")) || (update.get(0).getTransactionId().equals("null")) || (update.get(0).getOrgTransactionId().equals("null"))) ||
+                                        ((update.get(0).getRrn().equals("")) || (update.get(0).getResponseCode().equals("")) || (update.get(0).getTransactionDate().equals("")) || (update.get(0).getResponseDate().equals("")) || (update.get(0).getStan().equals("")) || (update.get(0).getPosDeviceId().equals("")) || (update.get(0).getMerchantId().equals("")) || (update.get(0).getTerminalId().equals("")) || (update.get(0).getInvoiceNumber().equals("")) || (update.get(0).getBatchNumber().equals("")) || (update.get(0).getAmount().equals("")) || (update.get(0).getTransactionType().equals("")) || (update.get(0).getTransactionId().equals("")) || (update.get(0).getOrgTransactionId().equals("")))) {
                                     logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
                                     update.get(0).setVoidReversalNullValueStatus(true);
                                     update.get(1).setVoidReversalNullValueStatus(true);
@@ -469,34 +479,18 @@ public class AtfFileServiceImpl implements AtfFileService {
                     } else {
                         if (update.get(1).getTransactionType().equals("Reversal")) {
                             if ((update.get(1).getStatus().equals("INIT"))) {
-//                                if (((update.get(1).getMaskedCardNumber() == null) || (update.get(1).getCardHolderName() == null) || (update.get(1).getRrn() == null) || (update.get(1).getTransactionAuthCode() == null) || (update.get(1).getResponseCode() == null) || (update.get(1).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getStan() == null) || (update.get(1).getMerchantId() == null) || (update.get(1).getTerminalId() == null) || (update.get(1).getPosDeviceId() == null) || (update.get(1).getInvoiceNumber() == null) || (update.get(1).getBatchNumber() == null) || (update.get(1).getAmount() == null) || (update.get(1).getTransactionType() == null) || (update.get(1).getTransactionId() == null) || (update.get(1).getOrgTransactionId() == null)) ||
-//                                        ((update.get(1).getMaskedCardNumber().equals("null")) || (update.get(1).getCardHolderName().equals("null")) || (update.get(1).getRrn().equals("null")) || (update.get(1).getTransactionAuthCode().equals("null")) || (update.get(1).getResponseCode().equals("null")) || (update.get(1).getTransactionDate().equals("null")) || (update.get(1).getResponseDate().equals("null")) || (update.get(1).getStan().equals("null")) || (update.get(1).getMerchantId().equals("null")) || (update.get(1).getTerminalId().equals("null")) || (update.get(1).getPosDeviceId().equals("null")) || (update.get(1).getInvoiceNumber().equals("null")) || (update.get(1).getBatchNumber().equals("null")) || (update.get(1).getAmount().equals("null")) || (update.get(1).getTransactionType().equals("null")) || (update.get(1).getTransactionId().equals("null")) || (update.get(1).getOrgTransactionId().equals("null")))) {
-//                                    logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(1).getTransactionId());
-//                                    update.get(0).setVoidReversalNullValueStatus(true);
-//                                    update.get(1).setVoidReversalNullValueStatus(true);
-//                                }
-
-                                if(update.get(0).getTransactionType().equals("Sale")) {
-//                                if(update.get(1).getResponseCode().equals("00")) {
-                                    if (((update.get(1).getMaskedCardNumber() == null) || (update.get(1).getCardHolderName() == null) || (update.get(1).getRrn() == null) || (update.get(1).getTransactionAuthCode() == null) || (update.get(1).getResponseCode() == null) || (update.get(1).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getStan() == null) || (update.get(1).getMerchantId() == null) || (update.get(1).getTerminalId() == null) || (update.get(1).getPosDeviceId() == null) || (update.get(1).getInvoiceNumber() == null) || (update.get(1).getBatchNumber() == null) || (update.get(1).getAmount() == null) || (update.get(1).getTransactionType() == null) || (update.get(1).getTransactionId() == null) || (update.get(1).getOrgTransactionId() == null)) ||
-                                            ((update.get(1).getMaskedCardNumber().equals("null")) || (update.get(1).getCardHolderName().equals("null")) || (update.get(1).getRrn().equals("null")) || (update.get(1).getTransactionAuthCode().equals("null")) || (update.get(1).getResponseCode().equals("null")) || (update.get(1).getTransactionDate().equals("null")) || (update.get(1).getResponseDate().equals("null")) || (update.get(1).getStan().equals("null")) || (update.get(1).getMerchantId().equals("null")) || (update.get(1).getTerminalId().equals("null")) || (update.get(1).getPosDeviceId().equals("null")) || (update.get(1).getInvoiceNumber().equals("null")) || (update.get(1).getBatchNumber().equals("null")) || (update.get(1).getAmount().equals("null")) || (update.get(1).getTransactionType().equals("null")) || (update.get(1).getTransactionId().equals("null")) || (update.get(1).getOrgTransactionId().equals("null"))) ||
-                                            ((update.get(1).getMaskedCardNumber().equals("")) || (update.get(1).getCardHolderName().equals("")) || (update.get(1).getRrn().equals("")) || (update.get(1).getTransactionAuthCode().equals("")) || (update.get(1).getResponseCode().equals("")) || (update.get(1).getTransactionDate().equals("")) || (update.get(1).getResponseDate().equals("")) || (update.get(1).getStan().equals("")) || (update.get(1).getMerchantId().equals("")) || (update.get(1).getTerminalId().equals("")) || (update.get(1).getPosDeviceId().equals("")) || (update.get(1).getInvoiceNumber().equals("")) || (update.get(1).getBatchNumber().equals("")) || (update.get(1).getAmount().equals("")) || (update.get(1).getTransactionType().equals("")) || (update.get(1).getTransactionId().equals("")) || (update.get(1).getOrgTransactionId().equals("")))) {
+                                if (update.get(0).getTransactionType().equals("Sale")) {
+                                    if (((update.get(1).getMaskedCardNumber() == null) || (update.get(1).getCardHolderName() == null) || (update.get(1).getRrn() == null) || (update.get(1).getPosDeviceId() == null) || (update.get(1).getTransactionAuthCode() == null) || (update.get(1).getResponseCode() == null) || (update.get(1).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getStan() == null) || (update.get(1).getMerchantId() == null) || (update.get(1).getTerminalId() == null) || (update.get(1).getInvoiceNumber() == null) || (update.get(1).getBatchNumber() == null) || (update.get(1).getAmount() == null) || (update.get(1).getTransactionType() == null) || (update.get(1).getTransactionId() == null) || (update.get(1).getOrgTransactionId() == null)) ||
+                                            ((update.get(1).getMaskedCardNumber().equals("null")) || (update.get(1).getCardHolderName().equals("null")) || (update.get(1).getRrn().equals("null")) || (update.get(1).getPosDeviceId().equals("null")) || (update.get(1).getTransactionAuthCode().equals("null")) || (update.get(1).getResponseCode().equals("null")) || (update.get(1).getTransactionDate().equals("null")) || (update.get(1).getResponseDate().equals("null")) || (update.get(1).getStan().equals("null")) || (update.get(1).getMerchantId().equals("null")) || (update.get(1).getTerminalId().equals("null")) || (update.get(1).getInvoiceNumber().equals("null")) || (update.get(1).getBatchNumber().equals("null")) || (update.get(1).getAmount().equals("null")) || (update.get(1).getTransactionType().equals("null")) || (update.get(1).getTransactionId().equals("null")) || (update.get(1).getOrgTransactionId().equals("null"))) ||
+                                            ((update.get(1).getMaskedCardNumber().equals("")) || (update.get(1).getCardHolderName().equals("")) || (update.get(1).getRrn().equals("")) || (update.get(1).getPosDeviceId().equals("")) || (update.get(1).getTransactionAuthCode().equals("")) || (update.get(1).getResponseCode().equals("")) || (update.get(1).getTransactionDate().equals("")) || (update.get(1).getResponseDate().equals("")) || (update.get(1).getStan().equals("")) || (update.get(1).getMerchantId().equals("")) || (update.get(1).getTerminalId().equals("")) || (update.get(1).getInvoiceNumber().equals("")) || (update.get(1).getBatchNumber().equals("")) || (update.get(1).getAmount().equals("")) || (update.get(1).getTransactionType().equals("")) || (update.get(1).getTransactionId().equals("")) || (update.get(1).getOrgTransactionId().equals("")))) {
                                         logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
                                         update.get(0).setVoidReversalNullValueStatus(true);
                                         update.get(1).setVoidReversalNullValueStatus(true);
                                     }
-//                                }else{
-//                                    if ((update.get(0).getRrn() == null || update.get(0).getResponseCode() == null || update.get(0).getTransactionDate() == null || update.get(0).getResponseDate() == null || update.get(0).getStan() == null || update.get(0).getMerchantId() == null || update.get(0).getTerminalId() == null || update.get(0).getPosDeviceId() == null || update.get(0).getInvoiceNumber() == null || update.get(0).getBatchNumber() == null || update.get(0).getAmount() == null || update.get(0).getTransactionType() == null || update.get(0).getTransactionId() == null || update.get(0).getOrgTransactionId() == null) ||
-//                                            (update.get(0).getMaskedCardNumber().equals("null") || update.get(0).getCardHolderName().equals("null") || update.get(0).getRrn().equals("null") || update.get(0).getTransactionAuthCode().equals("null") || update.get(0).getResponseCode().equals("null") || update.get(0).getTransactionDate().equals("null") || update.get(0).getResponseDate().equals("null") || update.get(0).getStan().equals("null") || update.get(0).getMerchantId().equals("null") || update.get(0).getTerminalId().equals("null") || update.get(0).getPosDeviceId().equals("null") || update.get(0).getInvoiceNumber().equals("null") || update.get(0).getBatchNumber().equals("null") || update.get(0).getAmount().equals("null") || update.get(0).getTransactionType().equals("null") || update.get(0).getTransactionId().equals("null") || update.get(0).getOrgTransactionId().equals("null"))) {
-//                                        logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
-//                                        update.get(0).setVoidReversalNullValueStatus(true);
-//                                        update.get(1).setVoidReversalNullValueStatus(true);
-//                                    }
-//                                }
                                 } else if (update.get(0).getTransactionType().equals("UPI")) {
-                                    if (((update.get(1).getRrn() == null) || (update.get(1).getResponseCode() == null) || (update.get(1).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getStan() == null) || (update.get(1).getMerchantId() == null) || (update.get(1).getTerminalId() == null) || (update.get(1).getPosDeviceId() == null) || (update.get(1).getInvoiceNumber() == null) || (update.get(1).getBatchNumber() == null) || (update.get(1).getAmount() == null) || (update.get(1).getTransactionType() == null) || (update.get(1).getTransactionId() == null) || (update.get(1).getOrgTransactionId() == null)) ||
-                                            ((update.get(1).getRrn().equals("null")) || (update.get(1).getResponseCode().equals("null")) || (update.get(1).getTransactionDate().equals("null")) || (update.get(1).getResponseDate().equals("null")) || (update.get(1).getStan().equals("null")) || (update.get(1).getMerchantId().equals("null")) || (update.get(1).getTerminalId().equals("null")) || (update.get(0).getPosDeviceId().equals("null")) || (update.get(1).getInvoiceNumber().equals("null")) || (update.get(1).getBatchNumber().equals("null")) || (update.get(1).getAmount().equals("null")) || (update.get(1).getTransactionType().equals("null")) || (update.get(1).getTransactionId().equals("null")) || (update.get(1).getOrgTransactionId().equals("null"))) ||
-                                            ((update.get(1).getRrn().equals("")) || (update.get(1).getResponseCode().equals("")) || (update.get(1).getTransactionDate().equals("")) || (update.get(1).getResponseDate().equals("")) || (update.get(1).getStan().equals("")) || (update.get(1).getMerchantId().equals("")) || (update.get(1).getTerminalId().equals("")) || (update.get(0).getPosDeviceId().equals("")) || (update.get(1).getInvoiceNumber().equals("")) || (update.get(1).getBatchNumber().equals("")) || (update.get(1).getAmount().equals("")) || (update.get(1).getTransactionType().equals("")) || (update.get(1).getTransactionId().equals("")) || (update.get(1).getOrgTransactionId().equals("")))) {
+                                    if (((update.get(1).getRrn() == null) || (update.get(1).getResponseCode() == null) || (update.get(1).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getStan() == null) || (update.get(1).getPosDeviceId() == null) || (update.get(1).getMerchantId() == null) || (update.get(1).getTerminalId() == null) || (update.get(1).getInvoiceNumber() == null) || (update.get(1).getBatchNumber() == null) || (update.get(1).getAmount() == null) || (update.get(1).getTransactionType() == null) || (update.get(1).getTransactionId() == null) || (update.get(1).getOrgTransactionId() == null)) ||
+                                            ((update.get(1).getRrn().equals("null")) || (update.get(1).getTransactionDate().equals("null")) || (update.get(1).getResponseDate().equals("null")) || (update.get(1).getStan().equals("null")) || (update.get(1).getPosDeviceId().equals("null")) || (update.get(1).getMerchantId().equals("null")) || (update.get(1).getTerminalId().equals("null")) || (update.get(1).getInvoiceNumber().equals("null")) || (update.get(1).getBatchNumber().equals("null")) || (update.get(1).getAmount().equals("null")) || (update.get(1).getTransactionType().equals("null")) || (update.get(1).getTransactionId().equals("null")) || (update.get(1).getOrgTransactionId().equals("null"))) ||
+                                            ((update.get(1).getRrn().equals("")) || (update.get(1).getResponseCode().equals("")) || (update.get(1).getTransactionDate().equals("")) || (update.get(1).getResponseDate().equals("")) || (update.get(1).getStan().equals("")) || (update.get(1).getPosDeviceId().equals("")) || (update.get(1).getMerchantId().equals("")) || (update.get(1).getTerminalId().equals("")) || (update.get(1).getInvoiceNumber().equals("")) || (update.get(1).getBatchNumber().equals("")) || (update.get(1).getAmount().equals("")) || (update.get(1).getTransactionType().equals("")) || (update.get(1).getTransactionId().equals("")) || (update.get(1).getOrgTransactionId().equals("")))) {
                                         logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
                                         update.get(0).setVoidReversalNullValueStatus(true);
                                         update.get(1).setVoidReversalNullValueStatus(true);
@@ -505,12 +499,11 @@ public class AtfFileServiceImpl implements AtfFileService {
                             }
                         }
                     }
-
                     if (update.get(0).getTransactionType().equals("Void")) {
                         if (!(update.get(0).getStatus().equals("INIT"))) {
-                            if (((update.get(0).getMaskedCardNumber() == null) || (update.get(0).getCardHolderName() == null) || (update.get(0).getRrn() == null) || (update.get(0).getTransactionAuthCode() == null) || (update.get(0).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getStan() == null) || (update.get(0).getMerchantId() == null) || (update.get(0).getTerminalId() == null) || (update.get(0).getPosDeviceId() == null) || (update.get(0).getInvoiceNumber() == null) || (update.get(0).getBatchNumber() == null) || (update.get(0).getAmount() == null) || (update.get(0).getTransactionType() == null) || (update.get(0).getTransactionId() == null) || (update.get(0).getOrgTransactionId() == null)) ||
-                                    ((update.get(0).getMaskedCardNumber().equals("null")) || (update.get(0).getCardHolderName().equals("null")) || (update.get(0).getRrn().equals("null")) || (update.get(0).getTransactionAuthCode().equals("null")) || (update.get(0).getResponseCode().equals("null")) || (update.get(0).getTransactionDate().equals("null")) || (update.get(0).getResponseDate().equals("null")) || (update.get(0).getStan().equals("null")) || (update.get(0).getMerchantId().equals("null")) || (update.get(0).getTerminalId().equals("null")) || (update.get(0).getPosDeviceId().equals("null")) || (update.get(0).getInvoiceNumber().equals("null")) || (update.get(0).getBatchNumber().equals("null")) || (update.get(0).getAmount().equals("null")) || (update.get(0).getTransactionType().equals("null")) || (update.get(0).getTransactionId().equals("null")) || (update.get(0).getOrgTransactionId().equals("null"))) ||
-                                    ((update.get(0).getMaskedCardNumber().equals("")) || (update.get(0).getCardHolderName().equals("")) || (update.get(0).getRrn().equals("")) || (update.get(0).getTransactionAuthCode().equals("")) || (update.get(0).getResponseCode().equals("")) || (update.get(0).getTransactionDate().equals("")) || (update.get(0).getResponseDate().equals("")) || (update.get(0).getStan().equals("")) || (update.get(0).getMerchantId().equals("")) || (update.get(0).getTerminalId().equals("")) || (update.get(0).getPosDeviceId().equals("")) || (update.get(0).getInvoiceNumber().equals("")) || (update.get(0).getBatchNumber().equals("")) || (update.get(0).getAmount().equals("")) || (update.get(0).getTransactionType().equals("")) || (update.get(0).getTransactionId().equals("")) || (update.get(0).getOrgTransactionId().equals("")))) {
+                            if (((update.get(0).getMaskedCardNumber() == null) || (update.get(0).getCardHolderName() == null) || (update.get(0).getRrn() == null) || (update.get(0).getPosDeviceId() == null) || (update.get(0).getTransactionAuthCode() == null) || (update.get(0).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getStan() == null) || (update.get(0).getMerchantId() == null) || (update.get(0).getTerminalId() == null) || (update.get(0).getInvoiceNumber() == null) || (update.get(0).getBatchNumber() == null) || (update.get(0).getAmount() == null) || (update.get(0).getTransactionType() == null) || (update.get(0).getTransactionId() == null) || (update.get(0).getOrgTransactionId() == null)) ||
+                                    ((update.get(0).getMaskedCardNumber().equals("null")) || (update.get(0).getCardHolderName().equals("null")) || (update.get(0).getRrn().equals("null")) || (update.get(0).getPosDeviceId().equals("null")) || (update.get(0).getTransactionAuthCode().equals("null")) || (update.get(0).getResponseCode().equals("null")) || (update.get(0).getTransactionDate().equals("null")) || (update.get(0).getResponseDate().equals("null")) || (update.get(0).getStan().equals("null")) || (update.get(0).getMerchantId().equals("null")) || (update.get(0).getTerminalId().equals("null")) || (update.get(0).getInvoiceNumber().equals("null")) || (update.get(0).getBatchNumber().equals("null")) || (update.get(0).getAmount().equals("null")) || (update.get(0).getTransactionType().equals("null")) || (update.get(0).getTransactionId().equals("null")) || (update.get(0).getOrgTransactionId().equals("null"))) ||
+                                    ((update.get(0).getMaskedCardNumber().equals("")) || (update.get(0).getCardHolderName().equals("")) || (update.get(0).getRrn().equals("")) || (update.get(0).getPosDeviceId().equals("")) || (update.get(0).getTransactionAuthCode().equals("")) || (update.get(0).getResponseCode().equals("")) || (update.get(0).getTransactionDate().equals("")) || (update.get(0).getResponseDate().equals("")) || (update.get(0).getStan().equals("")) || (update.get(0).getMerchantId().equals("")) || (update.get(0).getTerminalId().equals("")) || (update.get(0).getInvoiceNumber().equals("")) || (update.get(0).getBatchNumber().equals("")) || (update.get(0).getAmount().equals("")) || (update.get(0).getTransactionType().equals("")) || (update.get(0).getTransactionId().equals("")) || (update.get(0).getOrgTransactionId().equals("")))) {
                                 logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(0).getTransactionId());
                                 update.get(0).setVoidReversalNullValueStatus(true);
                                 update.get(1).setVoidReversalNullValueStatus(true);
@@ -519,9 +512,9 @@ public class AtfFileServiceImpl implements AtfFileService {
                     } else {
                         if (update.get(1).getTransactionType().equals("Void")) {
                             if (!(update.get(1).getStatus().equals("INIT"))) {
-                                if (((update.get(1).getMaskedCardNumber() == null) || (update.get(1).getCardHolderName() == null) || (update.get(1).getRrn() == null) || (update.get(1).getTransactionAuthCode() == null) || (update.get(1).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getStan() == null) || (update.get(1).getMerchantId() == null) || (update.get(1).getTerminalId() == null) || (update.get(1).getPosDeviceId() == null) || (update.get(1).getInvoiceNumber() == null) || (update.get(1).getBatchNumber() == null) || (update.get(1).getAmount() == null) || (update.get(1).getTransactionType() == null) || (update.get(1).getTransactionId() == null) || (update.get(1).getOrgTransactionId() == null)) ||
-                                        ((update.get(1).getMaskedCardNumber().equals("null")) || (update.get(1).getCardHolderName().equals("null")) || (update.get(1).getRrn().equals("null")) || (update.get(1).getTransactionAuthCode().equals("null")) || (update.get(1).getResponseCode().equals("null")) || (update.get(1).getTransactionDate().equals("null")) || (update.get(1).getResponseDate().equals("null")) || (update.get(1).getStan().equals("null")) || (update.get(1).getMerchantId().equals("null")) || (update.get(1).getTerminalId().equals("null")) || (update.get(1).getPosDeviceId().equals("null")) || (update.get(1).getInvoiceNumber().equals("null")) || (update.get(1).getBatchNumber().equals("null")) || (update.get(1).getAmount().equals("null")) || (update.get(1).getTransactionType().equals("null")) || (update.get(1).getTransactionId().equals("null")) || (update.get(1).getOrgTransactionId().equals("null"))) ||
-                                        ((update.get(1).getMaskedCardNumber().equals("")) || (update.get(1).getCardHolderName().equals("")) || (update.get(1).getRrn().equals("")) || (update.get(1).getTransactionAuthCode().equals("")) || (update.get(1).getResponseCode().equals("")) || (update.get(1).getTransactionDate().equals("")) || (update.get(1).getResponseDate().equals("")) || (update.get(1).getStan().equals("")) || (update.get(1).getMerchantId().equals("")) || (update.get(1).getTerminalId().equals("")) || (update.get(1).getPosDeviceId().equals("")) || (update.get(1).getInvoiceNumber().equals("")) || (update.get(1).getBatchNumber().equals("")) || (update.get(1).getAmount().equals("")) || (update.get(1).getTransactionType().equals("")) || (update.get(1).getTransactionId().equals("")) || (update.get(1).getOrgTransactionId().equals("")))) {
+                                if (((update.get(1).getMaskedCardNumber() == null) || (update.get(1).getCardHolderName() == null) || (update.get(1).getRrn() == null) || (update.get(1).getPosDeviceId() == null) || (update.get(1).getTransactionAuthCode() == null) || (update.get(1).getResponseCode() == null) || (update.get(0).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getStan() == null) || (update.get(1).getMerchantId() == null) || (update.get(1).getTerminalId() == null) || (update.get(1).getInvoiceNumber() == null) || (update.get(1).getBatchNumber() == null) || (update.get(1).getAmount() == null) || (update.get(1).getTransactionType() == null) || (update.get(1).getTransactionId() == null) || (update.get(1).getOrgTransactionId() == null)) ||
+                                        ((update.get(1).getMaskedCardNumber().equals("null")) || (update.get(1).getCardHolderName().equals("null")) || (update.get(1).getRrn().equals("null")) || (update.get(1).getPosDeviceId().equals("null")) || (update.get(1).getTransactionAuthCode().equals("null")) || (update.get(1).getResponseCode().equals("null")) || (update.get(1).getTransactionDate().equals("null")) || (update.get(1).getResponseDate().equals("null")) || (update.get(1).getStan().equals("null")) || (update.get(1).getMerchantId().equals("null")) || (update.get(1).getTerminalId().equals("null")) || (update.get(1).getInvoiceNumber().equals("null")) || (update.get(1).getBatchNumber().equals("null")) || (update.get(1).getAmount().equals("null")) || (update.get(1).getTransactionType().equals("null")) || (update.get(1).getTransactionId().equals("null")) || (update.get(1).getOrgTransactionId().equals("null"))) ||
+                                        ((update.get(1).getMaskedCardNumber().equals("")) || (update.get(1).getCardHolderName().equals("")) || (update.get(1).getRrn().equals("")) || (update.get(1).getPosDeviceId().equals("")) || (update.get(1).getTransactionAuthCode().equals("")) || (update.get(1).getResponseCode().equals("")) || (update.get(1).getTransactionDate().equals("")) || (update.get(1).getResponseDate().equals("")) || (update.get(1).getStan().equals("")) || (update.get(1).getMerchantId().equals("")) || (update.get(1).getTerminalId().equals("")) || (update.get(1).getInvoiceNumber().equals("")) || (update.get(1).getBatchNumber().equals("")) || (update.get(1).getAmount().equals("")) || (update.get(1).getTransactionType().equals("")) || (update.get(1).getTransactionId().equals("")) || (update.get(1).getOrgTransactionId().equals("")))) {
                                     logger.info(DOUBLE_VALUE + " Checking Void and Reversal Null Values ---{}", update.get(1).getTransactionId());
                                     update.get(0).setVoidReversalNullValueStatus(true);
                                     update.get(1).setVoidReversalNullValueStatus(true);
@@ -532,24 +525,63 @@ public class AtfFileServiceImpl implements AtfFileService {
 
                     if (update.get(0).getTransactionType().equals("Sale") || update.get(0).getTransactionType().equals("UPI") || update.get(0).getTransactionType().equals("Void")) {
                         if (!(update.get(1).getStatus().equals("INIT"))) {
-                            if ((update.get(1).getResponseDate().before(update.get(1).getTransactionDate())) || (update.get(0).getResponseDate().before(update.get(0).getTransactionDate()))) {
+                            if ((update.get(1).getResponseDate() == null) || (update.get(1).getTransactionDate() == null)) {
+                                update.get(0).setResponseDateCheck(true);
+                                update.get(1).setResponseDateCheck(true);
+                            } else if ((update.get(1).getResponseDate().before(update.get(1).getTransactionDate())) || (update.get(0).getResponseDate().before(update.get(0).getTransactionDate()))) {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             }
+                            if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                String date = null;
+                                try {
+                                    date = DateUtil.dateComparison(DateUtil.currentDate());
+                                } catch (ParseException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                try {
+                                    if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                        update.get(0).setResponseDateMismatch(true);
+                                        update.get(1).setResponseDateMismatch(true);
+                                    }
+                                } catch (ParseException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+
                         }
                     } else {
                         if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI") || update.get(1).getTransactionType().equals("Void")) {
                             if (!(update.get(0).getStatus().equals("INIT"))) {
-                                if ((update.get(0).getResponseDate().before(update.get(0).getTransactionDate())) || (update.get(1).getResponseDate().before(update.get(1).getTransactionDate()))) {
+                                if ((update.get(1).getResponseDate() == null) || (update.get(1).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getTransactionDate() == null)) {
                                     update.get(0).setResponseDateCheck(true);
                                     update.get(1).setResponseDateCheck(true);
+                                } else if ((update.get(0).getResponseDate().before(update.get(0).getTransactionDate())) || (update.get(1).getResponseDate().before(update.get(1).getTransactionDate()))) {
+                                    update.get(0).setResponseDateCheck(true);
+                                    update.get(1).setResponseDateCheck(true);
+                                }
+                                if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                    String date = null;
+                                    try {
+                                        date = DateUtil.dateComparison(DateUtil.currentDate());
+                                    } catch (ParseException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    try {
+                                        if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                            update.get(0).setResponseDateMismatch(true);
+                                            update.get(1).setResponseDateMismatch(true);
+                                        }
+                                    } catch (ParseException e) {
+                                        throw new RuntimeException(e);
+                                    }
                                 }
                             }
                         }
                     }
                     if (update.get(0).getTransactionType().equals("Reversal")) {
-                        if (!(update.get(1).getStatus().equals("INIT"))) {
-                            if ((update.get(1).getResponseDate() == null) || (update.get(1).getTransactionDate() == null)) {
+                        if (!(update.get(1).getStatus().equals("INIT")) && !(update.get(1).getTransactionType().equals("UPI"))) {
+                            if ((update.get(1).getResponseDate() == null) || (update.get(1).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getTransactionDate() == null)) {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             } else if (update.get(1).getResponseDate().before(update.get(1).getTransactionDate())) {
@@ -557,17 +589,49 @@ public class AtfFileServiceImpl implements AtfFileService {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             }
+                            if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                String date = null;
+                                try {
+                                    date = DateUtil.dateComparison(DateUtil.currentDate());
+                                } catch (ParseException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                try {
+                                    if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                        update.get(0).setResponseDateMismatch(true);
+                                        update.get(1).setResponseDateMismatch(true);
+                                    }
+                                } catch (ParseException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
                         }
                     } else {
                         if (update.get(1).getTransactionType().equals("Reversal")) {
-                            if (!(update.get(0).getStatus().equals("INIT"))) {
-                                if ((update.get(0).getResponseDate() == null) || (update.get(0).getTransactionDate() == null)) {
+                            if (!(update.get(0).getStatus().equals("INIT")) && !(update.get(0).getTransactionType().equals("UPI"))) {
+                                if ((update.get(0).getResponseDate() == null) || (update.get(0).getTransactionDate() == null) || (update.get(1).getResponseDate() == null) || (update.get(1).getTransactionDate() == null)) {
                                     update.get(0).setResponseDateCheck(true);
                                     update.get(1).setResponseDateCheck(true);
                                 } else if ((update.get(0).getResponseDate().before(update.get(0).getTransactionDate()))) {
                                     logger.info(DOUBLE_VALUE + " Compare Void ResponseDate and Transaction Date ---{}", update.get(0).getTransactionId());
                                     update.get(0).setResponseDateCheck(true);
                                     update.get(1).setResponseDateCheck(true);
+                                }
+                                if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                    String date = null;
+                                    try {
+                                        date = DateUtil.dateComparison(DateUtil.currentDate());
+                                    } catch (ParseException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    try {
+                                        if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                            update.get(0).setResponseDateMismatch(true);
+                                            update.get(1).setResponseDateMismatch(true);
+                                        }
+                                    } catch (ParseException e) {
+                                        throw new RuntimeException(e);
+                                    }
                                 }
                             }
                         }
@@ -581,6 +645,12 @@ public class AtfFileServiceImpl implements AtfFileService {
                 fileReport.setRulesVerifiedStatus(true);
                 if (fileReport.getTransactionType().equals("Sale") || fileReport.getTransactionType().equals("UPI") || fileReport.getTransactionType().equals("Void")) {
                     if (!(fileReport.getStatus().equals("INIT"))) {
+                        String date =null;
+                        try {
+                           date = DateUtil.dateComparison(DateUtil.currentDate());
+                        } catch (ParseException e) {
+                            throw new RuntimeException(e);
+                        }
                         if ((fileReport.getResponseDate() == null) || (fileReport.getTransactionDate() == null)) {
                             logger.info(SINGLE_VALUE + " Checking ResponseDate --{}", fileReport.getTransactionId());
                             fileReport.setResponseDateCheck(true);
@@ -588,21 +658,19 @@ public class AtfFileServiceImpl implements AtfFileService {
                             logger.info(SINGLE_VALUE + " Checking ResponseDate --{}", fileReport.getTransactionId());
                             fileReport.setResponseDateCheck(true);
                         }
+                        if(fileReport.getTransactionDate() !=null) {
+                            try {
+                                String date1 = DateUtil.dateComparison(fileReport.getTransactionDate());
+//                                logger.info("Comparison Date --{}", date1);
+                                if ((!date.equals(DateUtil.dateComparison(fileReport.getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(fileReport.getResponseDate())))) {
+                                    fileReport.setResponseDateMismatch(true);
+                                }
+                            } catch (ParseException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
                     }
                 }
-//                else {
-//                    if (fileReport.getTransactionType().equals("Reversal")) {
-//                        if (fileReport.getStatus().equals("INIT")) {
-//                            if ((fileReport.getResponseDate() == null) || (fileReport.getTransactionDate() == null)) {
-//                                logger.info(SINGLE_VALUE + " Checking ResponseDate --{}", fileReport.getTransactionId());
-//                                fileReport.setResponseDateCheck(true);
-//                            } else if (fileReport.getResponseDate().before(fileReport.getTransactionDate())) {
-//                                logger.info(SINGLE_VALUE + " Checking ResponseDate --{}", fileReport.getTransactionId());
-//                                fileReport.setResponseDateCheck(true);
-//                            }
-//                        }
-//                    }
-//                }
                 if (fileReport.getTransactionType().equals("Sale") || fileReport.getTransactionType().equals("UPI")) {
                     if (fileReport.getStatus().equals("ACK") || fileReport.getStatus().equals("HOST")) {
                         if (fileReport.getResponseCode().equals("00") && fileReport.getSettlementStatus().equals("NotSettled")) {
@@ -616,18 +684,18 @@ public class AtfFileServiceImpl implements AtfFileService {
                 }
                 if (fileReport.getTransactionType().equals("Sale")) {
                     if (!(fileReport.getStatus().equals("INIT"))) {
-                        if(fileReport.getResponseCode().equals("00")) {
-                            if ((fileReport.getRrn() == null || fileReport.getTransactionAuthCode() == null || fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getPosDeviceId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
-                                    (fileReport.getRrn().equals("null") || fileReport.getTransactionAuthCode().equals("null") || fileReport.getResponseCode().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
-                                    (fileReport.getRrn().equals("") || fileReport.getTransactionAuthCode().equals("") || fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
+                        if (fileReport.getResponseCode().equals("00")) {
+                            if ((fileReport.getRrn() == null || fileReport.getTransactionAuthCode() == null || fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getPosDeviceId() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
+                                    (fileReport.getRrn().equals("null") || fileReport.getTransactionAuthCode().equals("null") || fileReport.getResponseCode().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
+                                    (fileReport.getRrn().equals("") || fileReport.getTransactionAuthCode().equals("") || fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
                                 logger.info(SINGLE_VALUE + " checking Sale&UPI Required Fields is Null or Not---{}", fileReport.getTransactionId());
                                 fileReport.setSaleUpiNullValueStatus(true);
                             }
-                        }else{
-                            if(!(fileReport.getResponseCode().equals("00"))) {
-                                if ((fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getPosDeviceId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
-                                        (fileReport.getResponseCode().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
-                                        (fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
+                        } else {
+                            if (!(fileReport.getResponseCode().equals("00"))) {
+                                if ((fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getPosDeviceId() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
+                                        (fileReport.getResponseCode().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
+                                        (fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
                                     logger.info(SINGLE_VALUE + " checking Sale&UPI Required Fields is Null or Not---{}", fileReport.getTransactionId());
                                     fileReport.setSaleUpiNullValueStatus(true);
                                 }
@@ -638,18 +706,18 @@ public class AtfFileServiceImpl implements AtfFileService {
 
                 if (fileReport.getTransactionType().equals("UPI")) {
                     if (!(fileReport.getStatus().equals("INIT"))) {
-                        if(fileReport.getResponseCode().equals("00")) {
-                            if ((fileReport.getRrn() == null || fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getPosDeviceId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
-                                    (fileReport.getRrn().equals("null") || fileReport.getResponseCode().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
-                                    (fileReport.getRrn().equals("") || fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
+                        if (fileReport.getResponseCode().equals("00")) {
+                            if ((fileReport.getRrn() == null || fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getPosDeviceId() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
+                                    (fileReport.getRrn().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
+                                    (fileReport.getRrn().equals("") || fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
                                 logger.info(SINGLE_VALUE + " checking Sale&UPI Required Fields is Null or Not---{}", fileReport.getTransactionId());
                                 fileReport.setSaleUpiNullValueStatus(true);
                             }
-                        }else{
-                            if(!(fileReport.getResponseCode().equals("00"))) {
-                                if ((fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getPosDeviceId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
-                                        (fileReport.getResponseCode().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
-                                        (fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
+                        } else {
+                            if (!(fileReport.getResponseCode().equals("00"))) {
+                                if ((fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getPosDeviceId() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
+                                        (fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null")) ||
+                                        (fileReport.getResponseCode().equals("") || fileReport.getTransactionDate().equals("") || fileReport.getResponseDate().equals("") || fileReport.getStan().equals("") || fileReport.getPosDeviceId().equals("") || fileReport.getTerminalId().equals("") || fileReport.getMerchantId().equals("") || fileReport.getInvoiceNumber().equals("") || fileReport.getBatchNumber().equals("") || fileReport.getAmount().equals("") || fileReport.getTransactionType().equals("") || fileReport.getTransactionId().equals(""))) {
                                     logger.info(SINGLE_VALUE + " checking Sale&UPI Required Fields is Null or Not---{}", fileReport.getTransactionId());
                                     fileReport.setSaleUpiNullValueStatus(true);
                                 }
@@ -657,21 +725,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                         }
                     }
                 }
-//                else {
-//                    if (fileReport.getTransactionType().equals("Reversal")) {
-//                        if ((fileReport.getStatus().equals("INIT"))) {
-//                            if ((fileReport.getRrn() == null || fileReport.getTransactionAuthCode() == null || fileReport.getResponseCode() == null || fileReport.getTransactionDate() == null || fileReport.getResponseDate() == null || fileReport.getStan() == null || fileReport.getTerminalId() == null || fileReport.getMerchantId() == null || fileReport.getPosDeviceId() == null || fileReport.getInvoiceNumber() == null || fileReport.getBatchNumber() == null || fileReport.getAmount() == null || fileReport.getTransactionType() == null || fileReport.getTransactionId() == null) ||
-//                                    (fileReport.getRrn().equals("null") || fileReport.getTransactionAuthCode().equals("null") || fileReport.getResponseCode().equals("null") || fileReport.getTransactionDate().equals("null") || fileReport.getResponseDate().equals("null") || fileReport.getStan().equals("null") || fileReport.getTerminalId().equals("null") || fileReport.getMerchantId().equals("null") || fileReport.getPosDeviceId().equals("null") || fileReport.getInvoiceNumber().equals("null") || fileReport.getBatchNumber().equals("null") || fileReport.getAmount().equals("null") || fileReport.getTransactionType().equals("null") || fileReport.getTransactionId().equals("null"))) {
-//                                logger.info(SINGLE_VALUE + " checking Sale&UPI Required Fields is Null or Not---{}", fileReport.getTransactionId());
-//                                fileReport.setSaleUpiNullValueStatus(true);
-//                            }
-//                        }
-//                    }
-//                }
-                if(fileReport.getTransactionType().equals("Void")){
-                    fileReport.setOnlyVoidReversalWithoutSaleOrUPI(true);
-                }
-                if(fileReport.getTransactionType().equals("Reversal")){
+                if (fileReport.getTransactionType().equals("Void") || fileReport.getTransactionType().equals("Reversal") ) {
                     fileReport.setOnlyVoidReversalWithoutSaleOrUPI(true);
                 }
                 if (fileReport.getTransactionType().equals("Sale")) {
@@ -687,10 +741,27 @@ public class AtfFileServiceImpl implements AtfFileService {
         atfFileRepository.saveAll(singleEntry);
         atfFileRepository.saveAll(doubleEntry);
         logger.info("Rules Updated Successfully---");
-
-
     }
 
+
+    public void threadExecution1(List<String> transId) throws RuntimeException {
+        List<AtfFileReport> totalList = atfFileRepository.findByTransIdTotalList(transId);
+        logger.info("After Split up data Size --{}", totalList.size());
+        List<AtfFileReport> singleEntry = new ArrayList<>();
+        transId.forEach(l->{
+            List<AtfFileReport> update = totalList.stream().filter(t -> t.getTransactionId().equals(l) || t.getOrgTransactionId().equals(l)).collect(Collectors.toList());
+            if(update.size() ==1){
+                logger.info("Single Transaction Id List--{}", update.size());
+                AtfFileReport fileReport = totalList.stream().filter(p -> p.getTransactionId().equals(l)).findAny().orElse(null);
+                fileReport.setRulesVerifiedStatus(true);
+                if (fileReport.getTransactionType().equals("Void") || fileReport.getTransactionType().equals("Reversal") ) {
+                    fileReport.setOnlyVoidReversalWithoutSaleOrUPI(true);
+                }
+                singleEntry.add(fileReport);
+            }
+        });
+        atfFileRepository.saveAll(singleEntry);
+    }
     @Override
     public boolean updatesettlementFileData(String settlementFile) {
         boolean updated = false;
@@ -714,24 +785,24 @@ public class AtfFileServiceImpl implements AtfFileService {
                         String[] element = line.split(",");
                         if (element.length > 0) {
 //                            if(element[8].contains(DateUtil.previousDateForSettlement())){
-                                logger.info("Enter to insert Settlement Data--");
-                                SettlementFile settlementFile1 = new SettlementFile();
-                                settlementFile1.setMid(element[0]);
-                                settlementFile1.setTid(element[1]);
-                                settlementFile1.setBatchNumber(element[2]);
-                                settlementFile1.setInvoiceNumber(element[3]);
-                                settlementFile1.setStan(element[4]);
-                                settlementFile1.setRrn(element[5]);
-                                settlementFile1.setAuthCode(element[6]);
-                                settlementFile1.setAmount(element[7]);
-                                settlementFile1.setToChar(element[8]);
-                                settlementFile1.setAdditionalAmount(element[9]);
-                                settlementFile1.setStatus(element[10]);
+                            logger.info("Enter to insert Settlement Data--");
+                            SettlementFile settlementFile1 = new SettlementFile();
+                            settlementFile1.setMid(element[0]);
+                            settlementFile1.setTid(element[1]);
+                            settlementFile1.setBatchNumber(element[2]);
+                            settlementFile1.setInvoiceNumber(element[3]);
+                            settlementFile1.setStan(element[4]);
+                            settlementFile1.setRrn(element[5]);
+                            settlementFile1.setAuthCode(element[6]);
+                            settlementFile1.setAmount(element[7]);
+                            settlementFile1.setToChar(element[8]);
+                            settlementFile1.setAdditionalAmount(element[9]);
+                            settlementFile1.setStatus(element[10]);
 //                            settlementFile1.setDate(DateUtil.stringToDate(element[12]));
 
-                                settlementFile1.setDate(element[11]);
-                                settlementFile1.setFilename(element[12]);
-                                settlementFiles.add(settlementFile1);
+                            settlementFile1.setDate(element[11]);
+                            settlementFile1.setFilename(element[12]);
+                            settlementFiles.add(settlementFile1);
 //                            }
                         }
                     }
@@ -773,26 +844,26 @@ public class AtfFileServiceImpl implements AtfFileService {
                         String[] element = line.split(",");
                         if (element.length > 0) {
 //                            if(element[8].contains(DateUtil.previousDate())){
-                                logger.info("Enter to insert Txn List Data--{}",element[3]);
-                                TransactionList transactionList = new TransactionList();
-                                transactionList.setMti(element[0]);
-                                transactionList.setTxnType(element[1]);
-                                transactionList.setTerminalId(element[2]);
-                                transactionList.setMerchantId(element[3]);
-                                transactionList.setTxnDate(element[4]);
-                                transactionList.setTxnTime(element[5]);
-                                transactionList.setTxnAmount(element[6]);
-                                transactionList.setTxnResponseCode(element[7]);
-                                transactionList.setResponseReceivedTime(element[8]);
-                                transactionList.setRrn(element[9]);
-                                transactionList.setStan(element[10]);
-                                transactionList.setInvoiceNumber(element[11]);
-                                transactionList.setBatchNumber(element[12]);
-                                transactionList.setUrn(element[13]);
-                                transactionList.setAuthResponseCode(element[14]);
-                                transactionList.setTxnAdditionalAmount(element[15]);
-                                transactionList.setInstitutionId(element[16]);
-                                transactionLists.add(transactionList);
+                            logger.info("Enter to insert Txn List Data--{}", element[3]);
+                            TransactionList transactionList = new TransactionList();
+                            transactionList.setMti(element[0]);
+                            transactionList.setTxnType(element[1]);
+                            transactionList.setTerminalId(element[2]);
+                            transactionList.setMerchantId(element[3]);
+                            transactionList.setTxnDate(element[4]);
+                            transactionList.setTxnTime(element[5]);
+                            transactionList.setTxnAmount(element[6]);
+                            transactionList.setTxnResponseCode(element[7]);
+                            transactionList.setResponseReceivedTime(element[8]);
+                            transactionList.setRrn(element[9]);
+                            transactionList.setStan(element[10]);
+                            transactionList.setInvoiceNumber(element[11]);
+                            transactionList.setBatchNumber(element[12]);
+                            transactionList.setUrn(element[13]);
+                            transactionList.setAuthResponseCode(element[14]);
+                            transactionList.setTxnAdditionalAmount(element[15]);
+                            transactionList.setInstitutionId(element[16]);
+                            transactionLists.add(transactionList);
                         }
                     }
                 } catch (Exception e) {
@@ -809,7 +880,6 @@ public class AtfFileServiceImpl implements AtfFileService {
         }
         return updated;
     }
-
 
 
     @Override
@@ -837,6 +907,7 @@ public class AtfFileServiceImpl implements AtfFileService {
         atfFileRepository.deleteAll();
         settlementFileRepository.deleteAll();
         transactionListRepository.deleteAll();
+        txnListMainTotalRepository.deleteAll();
         return true;
     }
 
@@ -850,6 +921,85 @@ public class AtfFileServiceImpl implements AtfFileService {
         }
     }
 
+    @Override
+    public boolean updateTxnListTotalData(String missingTxnBefore) {
+        boolean updated = false;
+        // get the csv file
+        List<TxnListMainTotal> missingTxnListDataList = new ArrayList<>();
+        String fileExtension = "";
+        int index = missingTxnBefore.lastIndexOf(".");
+        if (index > 0) {
+            fileExtension = missingTxnBefore.substring(index + 1);
+            if (fileExtension.equals("csv")) {
+                BufferedReader fileReader = null;
+                try {
+                    String line = "";
+                    fileReader = new BufferedReader(new FileReader(missingTxnBefore));
+                    Files.write(Paths.get(missingTxnBefore), new String(Files.readAllBytes(Paths.get(missingTxnBefore))).replace("\"", "").getBytes());
+
+                    //read csv header
+                    fileReader.readLine();
+                    // Read customer data line by line
+                    while ((line = fileReader.readLine()) != null) {
+                        String[] element = line.split(",");
+                        if (element.length > 0) {
+                            logger.info("Enter to insert Txn List File Total Data--{}", element[16]);
+                            if ((element[16].equals("WL002") && element[7].equals("00")) && (element[1].equals("00") || element[1].equals("02") || element[1].equals("37") || element[1].equals("39"))) {
+                                TxnListMainTotal transactionList = new TxnListMainTotal();
+                                transactionList.setMti(element[0]);
+                                transactionList.setTxnType(element[1]);
+                                transactionList.setTerminalId(element[2]);
+                                transactionList.setMerchantId(element[3]);
+                                transactionList.setTxnDate(element[4]);
+                                transactionList.setTxnTime(element[5]);
+                                transactionList.setTxnAmount(element[6]);
+                                transactionList.setTxnResponseCode(element[7]);
+                                transactionList.setResponseReceivedTime(element[8]);
+                                transactionList.setRrn(element[9]);
+                                transactionList.setStan(element[10]);
+                                transactionList.setInvoiceNumber(element[11]);
+                                transactionList.setBatchNumber(element[12]);
+                                transactionList.setUrn(element[13]);
+                                transactionList.setAuthResponseCode(element[14]);
+                                transactionList.setTxnAdditionalAmount(element[15]);
+                                transactionList.setInstitutionId(element[16]);
+                                missingTxnListDataList.add(transactionList);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                try {
+                    txnListMainTotalRepository.saveAll(missingTxnListDataList);
+                    updated = true;
+                    logger.info("Missing Txn List File Total Data Inserted Successfully----!!!");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return updated;
+    }
+
+    @Override
+    public void generateMissingATFFileTxn() throws IOException {
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+        String atfFileSheet = "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+        String[] addressesArr = new String[1];
+
+        String date1 = DateUtil.allTxnDate().concat(" 23:00:00");
+        String date2 = DateUtil.allTxnDate2().concat(" 23:00:00");
+
+//        String date1 = "2023-10-13".concat(" 23:00:00");
+//        String date2 = "2023-10-14".concat(" 23:00:00");
+
+        addressesArr[0] = "Rule 17 - ATF File Missing Transactions - RRN List";
+        List<Object[]> missingData = txnListMainTotalRepository.findByATFFileMissingData(date1, date2);
+        logger.info("Missing Txn List Size --{}", missingData.size());
+        ReportUtil.generateAtfFileReportInTextFile(missingData, Constants.MISSING_TXN_HEADER, updatedAtfFile, atfFileSheet, addressesArr);
+
+    }
 
 
 }

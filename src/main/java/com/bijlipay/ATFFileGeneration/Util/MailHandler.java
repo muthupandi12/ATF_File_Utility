@@ -36,15 +36,10 @@ public class MailHandler {
                     "Bijlipay\n\n Note :" +
                     "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
                     " write to us @ service@bijlipay.co.in."));
-            String allTxnFileName =atfFileUpdatedPath + "All_Txn_File-" + DateUtil.allTxnDate() + ".csv";
-            String allTxnUpdatedFileName =atfFileUpdatedPath + "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
-
-            String allTxnFile =atfFileReportPath + "All_Txn_File-" + DateUtil.allTxnDate() + ".csv";
-            String allTxnUpdatedFile =atfFileUpdatedPath + "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
 
             FileSystemResource file = new FileSystemResource(atfFileReportPath + "All_Txn_File-" + DateUtil.allTxnDate() + ".csv");
             FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt");
-            helper.addAttachment(file.getFilename(), file);
+//            helper.addAttachment(file.getFilename(), file);
             helper.addAttachment(file1.getFilename(), file1);
             sender.send(message);
         } catch (MessagingException e) {
@@ -67,17 +62,26 @@ public class MailHandler {
                     "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
                     " write to us @ service@bijlipay.co.in."));
 
-            String allTxnMissingData =atfFileUpdatedPath + "All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv";
-            String settlementFileMissingData =atfFileUpdatedPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data_" + DateUtil.currentDate2() + ".csv";
-            String txnAndSettlementMissingData =atfFileUpdatedPath + "AllTxnAndSettlementMissingData_" + DateUtil.currentDate2() + ".csv";
+//            String allTxnMissingData =atfFileUpdatedPath + "All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv";
+//            String settlementFileMissingData =atfFileUpdatedPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data_" + DateUtil.currentDate2() + ".csv";
+//            String txnAndSettlementMissingData =atfFileUpdatedPath + "AllTxnAndSettlementMissingData_" + DateUtil.currentDate2() + ".csv";
+//
+//            String allTxnMissingDataFileName =String.format("All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv");
+//            String settlementFileMissingDataFileName =String.format("Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data_" + DateUtil.currentDate2() + ".csv");
+//            String txnAndSettlementMissingDataFileName =String.format("AllTxnAndSettlementMissingData_" + DateUtil.currentDate2() + ".csv");
+//
+//            helper.addAttachment(allTxnMissingDataFileName,new File(allTxnMissingData));
+//            helper.addAttachment(settlementFileMissingDataFileName,new File(settlementFileMissingData));
+//            helper.addAttachment(txnAndSettlementMissingDataFileName,new File(txnAndSettlementMissingData));
+//
 
-            String allTxnMissingDataFileName =String.format("All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv");
-            String settlementFileMissingDataFileName =String.format("Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data_" + DateUtil.currentDate2() + ".csv");
-            String txnAndSettlementMissingDataFileName =String.format("AllTxnAndSettlementMissingData_" + DateUtil.currentDate2() + ".csv");
 
-            helper.addAttachment(allTxnMissingDataFileName,new File(allTxnMissingData));
-            helper.addAttachment(settlementFileMissingDataFileName,new File(settlementFileMissingData));
-            helper.addAttachment(txnAndSettlementMissingDataFileName,new File(txnAndSettlementMissingData));
+            FileSystemResource allTxnFile = new FileSystemResource(atfFileUpdatedPath + "All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv");
+            FileSystemResource settlementFile = new FileSystemResource(atfFileUpdatedPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data_" + DateUtil.currentDate2() + ".csv");
+            FileSystemResource txnAndSettlementFile = new FileSystemResource(atfFileUpdatedPath + "AllTxnAndSettlementMissingData_" + DateUtil.currentDate2() + ".csv");
+            helper.addAttachment(allTxnFile.getFilename(),allTxnFile);
+            helper.addAttachment(settlementFile.getFilename(),settlementFile);
+            helper.addAttachment(txnAndSettlementFile.getFilename(),txnAndSettlementFile);
             sender.send(message);
         } catch (MessagingException e) {
             e.printStackTrace();
