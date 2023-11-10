@@ -43,10 +43,14 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport,Long> {
     @Query(value = "select t.transaction_id from atf_file_report_main t where t.settled_txn_wrong_corresponding_void_or_reversal =1 and t.transaction_type in ('Sale','UPI') ",nativeQuery = true)
     List<Object[]> findByAtfFileDataRule16();
 
-    @Query(value = "select t.transaction_id from atf_file_report_main t where t.only_void_reversal_without_sale_or_upi =1 ",nativeQuery = true)
+    @Query(value = "select t.org_transaction_id from atf_file_report_main t where t.only_void_reversal_without_sale_or_upi =1 ",nativeQuery = true)
     List<Object[]> findByAtfFileDataRule14();
     @Query(value = "select t.transaction_id from atf_file_report_main t where t.response_date_mismatch =1 and t.transaction_type in ('Sale','UPI') ",nativeQuery = true)
     List<Object[]> findByAtfFileDataRule15();
+
+
+    @Query(value = "select t.org_transaction_id from atf_file_report_main t where t.rules_verified_status =0 ",nativeQuery = true)
+    List<Object[]> findByAtfFileDataRule17();
     @Query(value = "select a from AtfFileReport a where a.transactionId =?1")
     List<AtfFileReport> getDataWithSearchTerm(String searchTerm);
 
@@ -58,7 +62,7 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport,Long> {
     @Query(value = "select distinct(a.transaction_id) from atf_file_report_main a where a.transaction_type in ('"+ Constants.Sale +"'"+",'"+Constants.UPI+"' ) and a.rules_verified_status =0 ",nativeQuery = true)
     List<String> findAllTransId();
 
-    @Query(value = "select distinct(a.transaction_id) from atf_file_report_main a where a.transaction_type in ('"+ Constants.Void +"'"+",'"+Constants.Reversal+"' ) and a.rules_verified_status =0 ",nativeQuery = true)
+    @Query(value = "select distinct(a.org_transaction_id) from atf_file_report_main a where a.transaction_type in ('"+ Constants.Void +"'"+",'"+Constants.Reversal+"' ) and a.rules_verified_status =0 ",nativeQuery = true)
     List<String> findAllTransIdForVoidOrReversal();
 
     @Query(value ="select a from AtfFileReport a where (a.transactionId IN (?1) OR a.orgTransactionId IN (?1)) ")

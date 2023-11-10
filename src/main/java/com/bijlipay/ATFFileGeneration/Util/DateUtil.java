@@ -6,6 +6,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Random;
 
 import static com.bijlipay.ATFFileGeneration.Util.Constants.DateFormat;
 import static com.bijlipay.ATFFileGeneration.Util.Constants.DateFormat1;
@@ -59,6 +60,13 @@ public class DateUtil {
         return dateFormatter.format(date);
     }
 
+    public static String dateToStringForMail(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd-HH");
+        String unique = dateFormatter.format(date);
+        String total = unique +"1";
+        return total;
+    }
+
     public static String dateComparison(Date date) throws ParseException {
         SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM");
         return dateFormatter.format(date);
@@ -94,7 +102,7 @@ public class DateUtil {
 
 
     public static Date oneHourBeforeDate(Date date){
-        Date newDate = DateUtils.addHours(date, -2);
+        Date newDate = DateUtils.addHours(date, -1);
         return newDate;
     }
 }

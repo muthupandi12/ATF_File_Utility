@@ -28,6 +28,9 @@ public class AtfFileController {
 
     @Value("${atf.file.report.path}")
     private String atfFileReportPath;
+
+    @Value("${atf.file.updated.path}")
+    private String updatedAtfFilePath;
     @Autowired
     private MailHandler mailHandler;
 
@@ -43,20 +46,23 @@ public class AtfFileController {
         boolean txnListAfter = false;
 //        String atfFile = atfFileReportPath + "All_Txn_File-" + allTxnDate + ".csv";
 
+        String atfFile = atfFileReportPath + "All_Txn_File.csv";
+
+
 //        String atfFile = atfFileReportPath + "All_Txn_File-2023-10-31.csv";
-        String atfFile = atfFileReportPath + "SettledTxnChecking.csv";
+//        String atfFile = atfFileReportPath + "ATFSettledTxn.csv";
 
 
-        String missingTxnBefore = atfFileReportPath + "TransactionList_"+ allTxnDate + ".csv";
-        String missingTxnAfter = atfFileReportPath + "TransactionList_"+ currentDate + ".csv";
-
-//        String missingTxnBefore = atfFileReportPath + "TransactionList_2023-10-14.csv";
-//        String missingTxnAfter = atfFileReportPath + "TransactionList_2023-10-15.csv";
+//        String missingTxnBefore = atfFileReportPath + "TransactionList_"+ allTxnDate + ".csv";
+//        String missingTxnAfter = atfFileReportPath + "TransactionList_"+ currentDate + ".csv";
+//
+        String missingTxnBefore = atfFileReportPath + "TransactionList-1.csv";
+        String missingTxnAfter = atfFileReportPath + "TransactionList1.csv";
 
         try {
             allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
-//            txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
-//            txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
+            txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
+            txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
             if (allTxnFileUpdated) {
                 logger.info("All Txn File Data inserted in db Successfully----{}", atfFile);
             }
@@ -71,13 +77,18 @@ public class AtfFileController {
             logger.info("Atf File All Rules Updated Successfully");
 
             atfFileService.generateAtfFileReport();
-//            atfFileService.generateMissingATFFileTxn();
-//            mailHandler.sendMail();
+            atfFileService.generateMissingATFFileTxn();
+            mailHandler.sendMail();
             logger.info("Mail Send Successfully....");
-//            Boolean remove =atfFileService.removeDataInDB();
-//            if(remove){
-//                logger.info("Remove Data in DB Successfully");
+//            String destinationPath = "/home/uat1/ATFFiles/";
+//            boolean upload = atfFileService.uploadFilesToSFTP(updatedAtfFilePath,destinationPath);
+//            if(upload){
+//                logger.info("File Moved SuccessFully---");
 //            }
+            Boolean remove =atfFileService.removeDataInDB();
+            if(remove){
+                logger.info("Remove Data in DB Successfully");
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -99,11 +110,17 @@ public class AtfFileController {
     @GetMapping("/upload-switch-txn-files")
     public void uploadSwitchTxnFiles() throws Exception {
         String settlementDate = DateUtil.currentDate2();
-        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_" + settlementDate + ".csv";
-        String txnListFile = atfFileReportPath + "TransactionList_" + DateUtil.currentDate1() + ".csv";
+//        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_" + settlementDate + ".csv";
+//        String txnListFile = atfFileReportPath + "TransactionList_" + DateUtil.currentDate1() + ".csv";
+
+        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT.csv";
+        String txnListFile = atfFileReportPath + "TransactionList1.csv";
         boolean settlementFileUpdated = false;
         boolean txnListFileUpdated = false;
+        String atfFile = atfFileReportPath + "All_Txn_File.csv";
+        boolean allTxnFileUpdated = false;
         try {
+            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
             settlementFileUpdated = atfFileService.updatesettlementFileData(settlementFile);
             txnListFileUpdated = atfFileService.updateTxnListData(txnListFile);
             if (new File(settlementFile).exists() && new File(txnListFile).exists()) {
@@ -113,6 +130,9 @@ public class AtfFileController {
                 if (txnListFileUpdated) {
                     logger.info("Txn List File Data inserted in db Successfully----{}", txnListFile);
                 }
+                if (allTxnFileUpdated) {
+                    logger.info("All Txn File Data inserted in db Successfully----{}", txnListFile);
+                }
             }
             atfFileService.generateAllTxnFileMissingDataFile();
             atfFileService.generateSettlementFileMissingDataFile();
@@ -121,13 +141,11 @@ public class AtfFileController {
             if(remove){
                 logger.info("Remove Data in DB Successfully");
             }
-            mailHandler.sendTotalFileMail();
-            logger.info("Send All Switch Txn Files Successfully");
+//            mailHandler.sendTotalFileMail();
+//            logger.info("Send All Switch Txn Files Successfully");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
-
 
 }

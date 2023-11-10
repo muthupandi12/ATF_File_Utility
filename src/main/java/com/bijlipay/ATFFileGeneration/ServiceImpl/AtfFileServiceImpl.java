@@ -12,6 +12,9 @@ import com.bijlipay.ATFFileGeneration.Service.AtfFileService;
 import com.bijlipay.ATFFileGeneration.Util.Constants;
 import com.bijlipay.ATFFileGeneration.Util.DateUtil;
 import com.bijlipay.ATFFileGeneration.Util.ReportUtil;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,17 +25,24 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.channels.Channel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.ParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.bijlipay.ATFFileGeneration.Util.Constants.*;
+
 @Service
 public class AtfFileServiceImpl implements AtfFileService {
 
     public static final String DOUBLE_VALUE = "DOUBLE ENTRY";
     public static final String SINGLE_VALUE = "SINGLE ENTRY";
+
+    private JSch mJschSession = null;
+    private Session mSSHSession = null;
+    private ChannelSftp mChannelSftp = null;
 
 
     @Autowired
@@ -121,6 +131,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                             allTxnFiles.add(allTxnFile1);
                         }
                     }
+                    fileReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -139,15 +150,18 @@ public class AtfFileServiceImpl implements AtfFileService {
     @Override
     public Boolean removeDataInDB() {
         atfFileRepository.deleteAll();
+        txnListMainTotalRepository.deleteAll();
         return true;
     }
 
     @Override
-    public void generateAtfFileReport() throws IOException {
-        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+    public void generateAtfFileReport() throws IOException, ParseException {
+//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
+
         String atfFileSheet = "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
         List<Object[]> atf = null;
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < 17; i++) {
             String[] addressesArr = new String[1];
             if (i == 0) {
                 addressesArr[0] = "Rule 1- SALE & UPI & VOID & Reversal ResponseDate lesser than transactionDate";
@@ -201,6 +215,9 @@ public class AtfFileServiceImpl implements AtfFileService {
             } else if (i == 15) {
                 addressesArr[0] = "Rule 16- SALE and UPI transactions with ACK or HOST with responsecode 00 but marked as not settled with corresponding VOID or Reversal in transactionDate before 23:00:00";
                 atf = atfFileRepository.findByAtfFileDataRule16();
+            }else if (i == 16) {
+                addressesArr[0] = "Rule 17- Rules Not Verified because Data alignment issues Data";
+                atf = atfFileRepository.findByAtfFileDataRule17();
             }
 //            ReportUtil.generateAtfFileDataDummy(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
             ReportUtil.generateAtfFileReportInTextFile(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
@@ -404,7 +421,10 @@ public class AtfFileServiceImpl implements AtfFileService {
                         }
                         if (update.get(0).getTransactionType().equals("Reversal") || update.get(0).getTransactionType().equals("Void")) {
                             try {
-                                if ((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
+                                logger.info("Date Original --{}",DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()));
+                                logger.info("Date After compare ---{}",(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))));
+                                logger.info("Date Compare --{}",((update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate())))));
+                                if ((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))) && (update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate())))) {
                                     if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
                                         if (((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("Settled")) || update.get(0).getSettlementStatus().equals("Settled")) {
                                             update.get(0).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
@@ -430,7 +450,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                         } else {
                             if (update.get(1).getTransactionType().equals("Reversal") || update.get(1).getTransactionType().equals("Void")) {
                                 try {
-                                    if ((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate())))) {
+                                    if ((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))) && (update.get(0).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(0).getTransactionDate())))) {
                                         if (update.get(0).getTransactionType().equals("Sale") || update.get(0).getTransactionType().equals("UPI")) {
                                             if (((update.get(0).getStatus().equals("ACK") || update.get(0).getStatus().equals("HOST")) && update.get(0).getResponseCode().equals("00") && update.get(0).getSettlementStatus().equals("Settled")) || update.get(1).getSettlementStatus().equals("Settled")) {
                                                 update.get(0).setNotSettledTxnWrongCorrespondingVoidOrReversal(true);
@@ -752,7 +772,7 @@ public class AtfFileServiceImpl implements AtfFileService {
             List<AtfFileReport> update = totalList.stream().filter(t -> t.getTransactionId().equals(l) || t.getOrgTransactionId().equals(l)).collect(Collectors.toList());
             if(update.size() ==1){
                 logger.info("Single Transaction Id List--{}", update.size());
-                AtfFileReport fileReport = totalList.stream().filter(p -> p.getTransactionId().equals(l)).findAny().orElse(null);
+                AtfFileReport fileReport = totalList.stream().filter(p -> p.getOrgTransactionId().equals(l)).findAny().orElse(null);
                 fileReport.setRulesVerifiedStatus(true);
                 if (fileReport.getTransactionType().equals("Void") || fileReport.getTransactionType().equals("Reversal") ) {
                     fileReport.setOnlyVoidReversalWithoutSaleOrUPI(true);
@@ -806,6 +826,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 //                            }
                         }
                     }
+                    fileReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -866,6 +887,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                             transactionLists.add(transactionList);
                         }
                     }
+                    fileReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -884,7 +906,9 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Override
     public void generateAllTxnFileMissingDataFile() {
-        File allTxnUpdatedFile = new File(updatedAtfFilePath + "All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv");
+//        File allTxnUpdatedFile = new File(updatedAtfFilePath + "All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv");
+        File allTxnUpdatedFile = new File(updatedAtfFilePath + "All_Txn_File_Missing_Data.csv");
+
         final String allTxnFileSheet = "All_Txn_File_Missing_Data-" + DateUtil.previousDate() + ".csv";
         List<Object[]> allTxnFileOut = transactionListRepository.findByMissingAllTxnData();
         if (!allTxnUpdatedFile.exists()) {
@@ -894,7 +918,9 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Override
     public void generateSettlementFileMissingDataFile() {
-        File settlementUpdatedFile = new File(updatedAtfFilePath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data_" + DateUtil.currentDate2() + ".csv");
+//        File settlementUpdatedFile = new File(updatedAtfFilePath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data_" + DateUtil.currentDate2() + ".csv");
+        File settlementUpdatedFile = new File(updatedAtfFilePath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data.csv");
+
         final String settlementFileSheet = "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_Missing_Data-" + DateUtil.currentDate2() + ".csv";
         List<Object[]> settlementFileOut = transactionListRepository.findByMissingSettlementData();
         if (!settlementUpdatedFile.exists()) {
@@ -907,13 +933,15 @@ public class AtfFileServiceImpl implements AtfFileService {
         atfFileRepository.deleteAll();
         settlementFileRepository.deleteAll();
         transactionListRepository.deleteAll();
-        txnListMainTotalRepository.deleteAll();
+//        txnListMainTotalRepository.deleteAll();
         return true;
     }
 
     @Override
     public void generateTxnAndSettlementMissingFile() {
-        File settlementUpdatedFile = new File(updatedAtfFilePath + "AllTxnAndSettlementFileMissingData_" + DateUtil.currentDate2() + ".csv");
+//        File settlementUpdatedFile = new File(updatedAtfFilePath + "AllTxnAndSettlementFileMissingData_" + DateUtil.currentDate2() + ".csv");
+        File settlementUpdatedFile = new File(updatedAtfFilePath + "AllTxnAndSettlementFileMissingData.csv");
+
         final String allTxnAndSettlementFileSheet = "AllTxnAndSettlementFileMissingData_-" + DateUtil.currentDate2() + ".csv";
         List<Object[]> allTxnAndSettlementFileOut = atfFileRepository.findByMissingAllTxnAndSettlementData();
         if (!settlementUpdatedFile.exists()) {
@@ -967,6 +995,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                             }
                         }
                     }
+                    fileReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -983,8 +1012,13 @@ public class AtfFileServiceImpl implements AtfFileService {
     }
 
     @Override
-    public void generateMissingATFFileTxn() throws IOException {
-        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+    public void generateMissingATFFileTxn() throws IOException, ParseException {
+//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated.txt";
+
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
+
+
         String atfFileSheet = "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
         String[] addressesArr = new String[1];
 
@@ -994,12 +1028,158 @@ public class AtfFileServiceImpl implements AtfFileService {
 //        String date1 = "2023-10-13".concat(" 23:00:00");
 //        String date2 = "2023-10-14".concat(" 23:00:00");
 
-        addressesArr[0] = "Rule 17 - ATF File Missing Transactions - RRN List";
+        addressesArr[0] = "Rule 18 - ATF File Missing Transactions - RRN List";
         List<Object[]> missingData = txnListMainTotalRepository.findByATFFileMissingData(date1, date2);
         logger.info("Missing Txn List Size --{}", missingData.size());
         ReportUtil.generateAtfFileReportInTextFile(missingData, Constants.MISSING_TXN_HEADER, updatedAtfFile, atfFileSheet, addressesArr);
 
     }
+
+    @Override
+    public boolean uploadFilesToSFTP(String sourcePath, String destination) {
+        boolean connectionStatus = false;
+        boolean status = false;
+
+        try {
+            this.mJschSession = new JSch();
+
+            Properties config = new Properties();
+
+            config.put("StrictHostKeyChecking", "no");
+
+            JSch.setConfig(config);
+
+            this.mSSHSession = mJschSession.getSession(SFTP_ATF_USERNAME, SFTP_ATF_HOST, SFTP_ATF_PORT);
+
+            this.mSSHSession.setPassword(SFTP_ATF_PASSWORD);
+
+            this.mSSHSession.setConfig("PreferredAuthentications",
+                    "publickey,keyboard-interactive,password");
+
+            this.mSSHSession.connect();
+
+            logger.info("Connected Success! for the path {}",sourcePath);
+            this.mChannelSftp = (ChannelSftp) this.mSSHSession.openChannel("sftp");
+
+            this.mChannelSftp.connect();
+
+            if (this.mChannelSftp != null) {
+                connectionStatus = true;
+            }
+            if (connectionStatus) {
+                mChannelSftp.cd(destination);
+                File paths = new File(sourcePath);
+                String[] files = paths.list();
+                for (String fileName:files){
+                    logger.info("upload file Name {} ",fileName);
+                    mChannelSftp.put(sourcePath+"/"+fileName,destination);
+                    logger.info("uploaded");
+                }
+                status = true;
+//                logger.info("upload Success! ");
+                if (status) {
+                    logger.info("Moved Success! destination- {}-{}",sourcePath,status);
+                    return status;
+                } else {
+                    logger.info("Not Moved! {}",status);
+                    return false;
+                }
+
+            } else {
+                return status;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                this.mChannelSftp.disconnect();
+            } catch (Exception e) {
+                System.out.print(e);
+            }
+            try {
+                this.mSSHSession.disconnect();
+                status = true;
+            } catch (Exception e) {
+                System.out.print(e);
+            }
+        }
+        return status;
+    }
+
+
+    public boolean uploadMicro(String sourcePath,String destination) {
+
+        boolean connectionStatus = false;
+        boolean status = false;
+
+        try {
+            this.mJschSession = new JSch();
+
+            Properties config = new Properties();
+
+            config.put("StrictHostKeyChecking", "no");
+
+            JSch.setConfig(config);
+
+            this.mSSHSession = mJschSession.getSession(SFTP_ATF_USERNAME, SFTP_ATF_HOST, SFTP_ATF_PORT);
+
+            this.mSSHSession.setPassword(SFTP_ATF_PASSWORD);
+
+            this.mSSHSession.setConfig("PreferredAuthentications",
+                    "publickey,keyboard-interactive,password");
+
+            this.mSSHSession.connect();
+
+            logger.info("Connected Success! for the path {}",sourcePath);
+            this.mChannelSftp = (ChannelSftp) this.mSSHSession.openChannel("sftp");
+
+            this.mChannelSftp.connect();
+
+            if (this.mChannelSftp != null) {
+                connectionStatus = true;
+            }
+            if (connectionStatus) {
+                mChannelSftp.cd(destination);
+                File paths = new File(sourcePath);
+                String[] files = paths.list();
+                for (String fileName:files){
+                    logger.info("upload file Name {} ",fileName);
+                    mChannelSftp.put(sourcePath+"/"+fileName,destination);
+                    logger.info("uploaded");
+                }
+                status = true;
+                logger.info("upload Success! ");
+                if (status) {
+                    logger.info("Moved Success! destination- {}-{}",sourcePath,status);
+                    return status;
+                } else {
+                    logger.info("Not Moved! {}",status);
+                    return false;
+                }
+
+            } else {
+                return status;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                this.mChannelSftp.disconnect();
+            } catch (Exception e) {
+                System.out.print(e);
+            }
+            try {
+                this.mSSHSession.disconnect();
+                status = true;
+            } catch (Exception e) {
+                System.out.print(e);
+            }
+        }
+        return status;
+    }
+
+
+
 
 
 }

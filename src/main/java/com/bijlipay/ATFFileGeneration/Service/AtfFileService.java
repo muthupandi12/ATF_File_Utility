@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,7 +17,7 @@ public interface AtfFileService {
 
     Boolean removeDataInDB();
 
-    void generateAtfFileReport() throws IOException;
+    void generateAtfFileReport() throws IOException, ParseException;
 
     List<AtfFileReport> getAtfFileData(Optional<String> searchTerm);
 
@@ -39,7 +40,9 @@ public interface AtfFileService {
 
     boolean updateTxnListTotalData(String missingTxnBefore);
 
-    void generateMissingATFFileTxn() throws IOException;
+    void generateMissingATFFileTxn() throws IOException, ParseException;
+
+    boolean uploadFilesToSFTP(String updatedAtfFilePath, String destinationPath);
 }
 
 

@@ -30,16 +30,24 @@ public class Constants {
 
     public static final String[] ATF_FILE_HEADER2 = {"transactionId","responseDateCheck","voidAndSaleTxnIdCheckWithDate","reversalAndSaleTxnIdCheckWithDate","voidTxnResponseCodeCheck","reversalAndAckStatus","settledTxnWrongStatus","notSettledTxnWrongStatus","voidTxnOtherThanHostStatus","saleUpiNullValueStatus","voidReversalNullValueStatus","upiAndReversalTxnIdEqualStatus","saleTxnOnlyInitStatus"};
 
-    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","sarvesh@bijlipay.co.in","ramalingom.sundaram@bijlipay.co.in"};
+//    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","sarvesh@bijlipay.co.in","ramalingom.sundaram@bijlipay.co.in"};
 
 //    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in"};
 
+    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in"};
 
     public static final String[] SENT_TOTAL_MAIL = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","selvamuthukumar@bijlipay.co.in"};
 
 //    public static final String[] SENT_TOTAL_MAIL = {"muthupandi@bijlipay.co.in"};
 
 
+    public static final int SESSION_TIMEOUT = 15000;
+    public static final int CHANNEL_TIMEOUT = 15000;
+
+    public static final String SFTP_ATF_HOST = "192.168.4.200";
+    public static final String SFTP_ATF_USERNAME = "uat1";
+    public static final String SFTP_ATF_PASSWORD = "Uat@1234";
+    public static final int SFTP_ATF_PORT = 22;
 
 
 }
