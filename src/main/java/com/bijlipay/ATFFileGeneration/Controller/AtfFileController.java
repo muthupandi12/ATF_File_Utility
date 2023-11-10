@@ -78,6 +78,10 @@ public class AtfFileController {
 
             atfFileService.generateAtfFileReport();
             atfFileService.generateMissingATFFileTxn();
+            Boolean remove =atfFileService.removeDataInDB();
+            if(remove){
+                logger.info("Remove Data in DB Successfully");
+            }
             mailHandler.sendMail();
             logger.info("Mail Send Successfully....");
 //            String destinationPath = "/home/uat1/ATFFiles/";
@@ -85,10 +89,7 @@ public class AtfFileController {
 //            if(upload){
 //                logger.info("File Moved SuccessFully---");
 //            }
-            Boolean remove =atfFileService.removeDataInDB();
-            if(remove){
-                logger.info("Remove Data in DB Successfully");
-            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
