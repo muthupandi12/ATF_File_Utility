@@ -1,5 +1,6 @@
 package com.bijlipay.ATFFileGeneration.Repository;
 
+import com.bijlipay.ATFFileGeneration.Model.Dto.DateDto;
 import com.bijlipay.ATFFileGeneration.Model.TxnListMainTotal;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +19,9 @@ public interface TxnListMainTotalRepository extends JpaRepository<TxnListMainTot
 
 
 
-    @Query(value = "select t.rrn from txn_list_main_total t where t.response_received_time between ?1 and ?2 and t.rrn not in(select m.rrn from atf_file_report_main m where m.response_code ='00')",nativeQuery = true)
+    @Query(value = "select distinct(t.rrn) from txn_list_main_total t where t.response_received_time between ?1 and ?2 and t.rrn not in(select m.rrn from atf_file_report_main m where m.response_code ='00')",nativeQuery = true)
     List<Object[]> findByATFFileMissingData(String previousDate1, String previousDate2);
+
+    @Query(value = "select new com.bijlipay.ATFFileGeneration.Model.Dto.DateDto(min(t.responseReceivedTime) as minDate,max(t.responseReceivedTime) as maxDate) from TxnListMainTotal t")
+    DateDto findByDates();
 }

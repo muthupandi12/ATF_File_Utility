@@ -1,6 +1,7 @@
 package com.bijlipay.ATFFileGeneration.ServiceImpl;
 
 import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
+import com.bijlipay.ATFFileGeneration.Model.Dto.DateDto;
 import com.bijlipay.ATFFileGeneration.Model.TxnListMainTotal;
 import com.bijlipay.ATFFileGeneration.Model.SettlementFile;
 import com.bijlipay.ATFFileGeneration.Model.TransactionList;
@@ -15,6 +16,8 @@ import com.bijlipay.ATFFileGeneration.Util.ReportUtil;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +31,9 @@ import java.io.IOException;
 import java.nio.channels.Channel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.DateFormat;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -72,19 +77,15 @@ public class AtfFileServiceImpl implements AtfFileService {
         if (index > 0) {
             fileExtension = atfFile.substring(index + 1);
             if (fileExtension.equals("csv")) {
-                BufferedReader fileReader = null;
                 try {
-                    String line = "";
-                    fileReader = new BufferedReader(new FileReader(atfFile));
-                    Files.write(Paths.get(atfFile), new String(Files.readAllBytes(Paths.get(atfFile))).replace("\"", "").getBytes());
-
-                    //read csv header
-                    fileReader.readLine();
-                    // Read customer data line by line
-                    while ((line = fileReader.readLine()) != null) {
-                        String[] element = line.split(",");
-                        if (element.length > 0) {
-                            logger.info("Enter to insert All Txn Data--");
+                    CSVReader csvReader = new CSVReaderBuilder(new FileReader(atfFile)).withSkipLines(1).build();
+                    List<String[]> csvData = csvReader.readAll();
+                    int dataCount = atfFileRepository.findTotalInsertedData();
+                    logger.info("Inserted Data Count--{}", dataCount);
+                    if (dataCount < csvData.size()) {
+                        for (int i = dataCount; i < csvData.size(); i++) {
+                            String[] element = csvData.get(i);
+                            logger.info("Enter to insert All Txn Data--{}", element[18]);
                             AtfFileReport allTxnFile1 = new AtfFileReport();
                             allTxnFile1.setTerminalId(element[0] != null ? element[0] : "");
                             allTxnFile1.setMerchantId(element[1] != null ? element[1] : "");
@@ -131,7 +132,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                             allTxnFiles.add(allTxnFile1);
                         }
                     }
-                    fileReader.close();
+                    csvReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -155,11 +156,13 @@ public class AtfFileServiceImpl implements AtfFileService {
     }
 
     @Override
-    public void generateAtfFileReport() throws IOException, ParseException {
+    public void generateAtfFileReport(String date) throws IOException, ParseException {
 //        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
-        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
+//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
 
-        String atfFileSheet = "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ date + ".txt";
+
+        String atfFileSheet = "All_Txn_File_Updated-" + date + ".txt";
         List<Object[]> atf = null;
         for (int i = 0; i < 17; i++) {
             String[] addressesArr = new String[1];
@@ -421,9 +424,9 @@ public class AtfFileServiceImpl implements AtfFileService {
                         }
                         if (update.get(0).getTransactionType().equals("Reversal") || update.get(0).getTransactionType().equals("Void")) {
                             try {
-                                logger.info("Date Original --{}",DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()));
-                                logger.info("Date After compare ---{}",(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))));
-                                logger.info("Date Compare --{}",((update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate())))));
+//                                logger.info("Date Original --{}",DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()));
+//                                logger.info("Date After compare ---{}",(DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))));
+//                                logger.info("Date Compare --{}",((update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate())))));
                                 if ((DateUtil.parseSimpleDateForRules(update.get(0).getTransactionDate()).equals(DateUtil.parseSimpleDateForRules(update.get(1).getTransactionDate()))) && (update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate())))) {
                                     if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
                                         if (((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("Settled")) || update.get(0).getSettlementStatus().equals("Settled")) {
@@ -433,8 +436,8 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     }
                                 } else {
                                     String oneHourDate = DateUtil.dateToString(update.get(1).getTransactionDate());
-                                    logger.info("One Hour Date --{}", oneHourDate);
-                                    logger.info("After One --{}",DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()));
+//                                    logger.info("One Hour Date --{}", oneHourDate);
+//                                    logger.info("After One --{}",DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()));
                                         if (update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()))) {
                                             if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
                                                 if (((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("NotSettled")) || update.get(0).getSettlementStatus().equals("NotSettled")) {
@@ -459,8 +462,8 @@ public class AtfFileServiceImpl implements AtfFileService {
                                         }
                                     } else {
                                         String oneHourDate = DateUtil.dateToString(update.get(0).getTransactionDate());
-                                        logger.info("One Hour Date --{}",oneHourDate);
-                                        logger.info("After One --{}",(update.get(0).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(0).getTransactionDate()))));
+//                                        logger.info("One Hour Date --{}",oneHourDate);
+//                                        logger.info("After One --{}",(update.get(0).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(0).getTransactionDate()))));
                                         if (update.get(0).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(0).getTransactionDate()))) {
                                             if (update.get(0).getTransactionType().equals("Sale") || update.get(0).getTransactionType().equals("UPI")) {
                                                 if (((update.get(0).getStatus().equals("ACK") || update.get(0).getStatus().equals("HOST")) && update.get(0).getResponseCode().equals("00") && update.get(0).getSettlementStatus().equals("NotSettled")) || update.get(1).getSettlementStatus().equals("NotSettled")) {
@@ -782,6 +785,7 @@ public class AtfFileServiceImpl implements AtfFileService {
         });
         atfFileRepository.saveAll(singleEntry);
     }
+
     @Override
     public boolean updatesettlementFileData(String settlementFile) {
         boolean updated = false;
@@ -792,41 +796,29 @@ public class AtfFileServiceImpl implements AtfFileService {
         if (index > 0) {
             fileExtension = settlementFile.substring(index + 1);
             if (fileExtension.equals("csv")) {
-                BufferedReader fileReader = null;
                 try {
-                    String line = "";
-                    fileReader = new BufferedReader(new FileReader(settlementFile));
-                    Files.write(Paths.get(settlementFile), new String(Files.readAllBytes(Paths.get(settlementFile))).replace("\"", "").getBytes());
-
-                    //read csv header
-                    fileReader.readLine();
-                    // Read customer data line by line
-                    while ((line = fileReader.readLine()) != null) {
-                        String[] element = line.split(",");
-                        if (element.length > 0) {
-//                            if(element[8].contains(DateUtil.previousDateForSettlement())){
-                            logger.info("Enter to insert Settlement Data--");
-                            SettlementFile settlementFile1 = new SettlementFile();
-                            settlementFile1.setMid(element[0]);
-                            settlementFile1.setTid(element[1]);
-                            settlementFile1.setBatchNumber(element[2]);
-                            settlementFile1.setInvoiceNumber(element[3]);
-                            settlementFile1.setStan(element[4]);
-                            settlementFile1.setRrn(element[5]);
-                            settlementFile1.setAuthCode(element[6]);
-                            settlementFile1.setAmount(element[7]);
-                            settlementFile1.setToChar(element[8]);
-                            settlementFile1.setAdditionalAmount(element[9]);
-                            settlementFile1.setStatus(element[10]);
-//                            settlementFile1.setDate(DateUtil.stringToDate(element[12]));
-
-                            settlementFile1.setDate(element[11]);
-                            settlementFile1.setFilename(element[12]);
-                            settlementFiles.add(settlementFile1);
-//                            }
-                        }
+                    CSVReader csvReader = new CSVReaderBuilder(new FileReader(settlementFile)).withSkipLines(1).build();
+                    List<String[]> csvData = csvReader.readAll();
+                    for (int i = 0; i < csvData.size(); i++) {
+                        String[] element = csvData.get(i);
+                        logger.info("Enter to insert Settlement Data--");
+                        SettlementFile settlementFile1 = new SettlementFile();
+                        settlementFile1.setMid(element[0]);
+                        settlementFile1.setTid(element[1]);
+                        settlementFile1.setBatchNumber(element[2]);
+                        settlementFile1.setInvoiceNumber(element[3]);
+                        settlementFile1.setStan(element[4]);
+                        settlementFile1.setRrn(element[5]);
+                        settlementFile1.setAuthCode(element[6]);
+                        settlementFile1.setAmount(element[7]);
+                        settlementFile1.setToChar(element[8]);
+                        settlementFile1.setAdditionalAmount(element[9]);
+                        settlementFile1.setStatus(element[10]);
+                        settlementFile1.setDate(element[11]);
+                        settlementFile1.setFilename(element[12]);
+                        settlementFiles.add(settlementFile1);
                     }
-                    fileReader.close();
+                    csvReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -852,42 +844,33 @@ public class AtfFileServiceImpl implements AtfFileService {
         if (index > 0) {
             fileExtension = txnListFile.substring(index + 1);
             if (fileExtension.equals("csv")) {
-                BufferedReader fileReader = null;
                 try {
-                    String line = "";
-                    fileReader = new BufferedReader(new FileReader(txnListFile));
-                    Files.write(Paths.get(txnListFile), new String(Files.readAllBytes(Paths.get(txnListFile))).replace("\"", "").getBytes());
-
-                    //read csv header
-                    fileReader.readLine();
-                    // Read customer data line by line
-                    while ((line = fileReader.readLine()) != null) {
-                        String[] element = line.split(",");
-                        if (element.length > 0) {
-//                            if(element[8].contains(DateUtil.previousDate())){
-                            logger.info("Enter to insert Txn List Data--{}", element[3]);
-                            TransactionList transactionList = new TransactionList();
-                            transactionList.setMti(element[0]);
-                            transactionList.setTxnType(element[1]);
-                            transactionList.setTerminalId(element[2]);
-                            transactionList.setMerchantId(element[3]);
-                            transactionList.setTxnDate(element[4]);
-                            transactionList.setTxnTime(element[5]);
-                            transactionList.setTxnAmount(element[6]);
-                            transactionList.setTxnResponseCode(element[7]);
-                            transactionList.setResponseReceivedTime(element[8]);
-                            transactionList.setRrn(element[9]);
-                            transactionList.setStan(element[10]);
-                            transactionList.setInvoiceNumber(element[11]);
-                            transactionList.setBatchNumber(element[12]);
-                            transactionList.setUrn(element[13]);
-                            transactionList.setAuthResponseCode(element[14]);
-                            transactionList.setTxnAdditionalAmount(element[15]);
-                            transactionList.setInstitutionId(element[16]);
-                            transactionLists.add(transactionList);
-                        }
+                    CSVReader csvReader = new CSVReaderBuilder(new FileReader(txnListFile)).withSkipLines(1).build();
+                    List<String[]> csvData = csvReader.readAll();
+                    for (int i = 0; i < csvData.size(); i++) {
+                        String[] element = csvData.get(i);
+                        logger.info("Enter to insert Txn List Data--{}", element[3]);
+                        TransactionList transactionList = new TransactionList();
+                        transactionList.setMti(element[0]);
+                        transactionList.setTxnType(element[1]);
+                        transactionList.setTerminalId(element[2]);
+                        transactionList.setMerchantId(element[3]);
+                        transactionList.setTxnDate(element[4]);
+                        transactionList.setTxnTime(element[5]);
+                        transactionList.setTxnAmount(element[6]);
+                        transactionList.setTxnResponseCode(element[7]);
+                        transactionList.setResponseReceivedTime(element[8]);
+                        transactionList.setRrn(element[9]);
+                        transactionList.setStan(element[10]);
+                        transactionList.setInvoiceNumber(element[11]);
+                        transactionList.setBatchNumber(element[12]);
+                        transactionList.setUrn(element[13]);
+                        transactionList.setAuthResponseCode(element[14]);
+                        transactionList.setTxnAdditionalAmount(element[15]);
+                        transactionList.setInstitutionId(element[16]);
+                        transactionLists.add(transactionList);
                     }
-                    fileReader.close();
+                    csvReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -933,7 +916,6 @@ public class AtfFileServiceImpl implements AtfFileService {
         atfFileRepository.deleteAll();
         settlementFileRepository.deleteAll();
         transactionListRepository.deleteAll();
-//        txnListMainTotalRepository.deleteAll();
         return true;
     }
 
@@ -959,43 +941,35 @@ public class AtfFileServiceImpl implements AtfFileService {
         if (index > 0) {
             fileExtension = missingTxnBefore.substring(index + 1);
             if (fileExtension.equals("csv")) {
-                BufferedReader fileReader = null;
                 try {
-                    String line = "";
-                    fileReader = new BufferedReader(new FileReader(missingTxnBefore));
-                    Files.write(Paths.get(missingTxnBefore), new String(Files.readAllBytes(Paths.get(missingTxnBefore))).replace("\"", "").getBytes());
-
-                    //read csv header
-                    fileReader.readLine();
-                    // Read customer data line by line
-                    while ((line = fileReader.readLine()) != null) {
-                        String[] element = line.split(",");
-                        if (element.length > 0) {
-                            logger.info("Enter to insert Txn List File Total Data--{}", element[16]);
-                            if ((element[16].equals("WL002") && element[7].equals("00")) && (element[1].equals("00") || element[1].equals("02") || element[1].equals("37") || element[1].equals("39"))) {
-                                TxnListMainTotal transactionList = new TxnListMainTotal();
-                                transactionList.setMti(element[0]);
-                                transactionList.setTxnType(element[1]);
-                                transactionList.setTerminalId(element[2]);
-                                transactionList.setMerchantId(element[3]);
-                                transactionList.setTxnDate(element[4]);
-                                transactionList.setTxnTime(element[5]);
-                                transactionList.setTxnAmount(element[6]);
-                                transactionList.setTxnResponseCode(element[7]);
-                                transactionList.setResponseReceivedTime(element[8]);
-                                transactionList.setRrn(element[9]);
-                                transactionList.setStan(element[10]);
-                                transactionList.setInvoiceNumber(element[11]);
-                                transactionList.setBatchNumber(element[12]);
-                                transactionList.setUrn(element[13]);
-                                transactionList.setAuthResponseCode(element[14]);
-                                transactionList.setTxnAdditionalAmount(element[15]);
-                                transactionList.setInstitutionId(element[16]);
-                                missingTxnListDataList.add(transactionList);
-                            }
+                    CSVReader csvReader = new CSVReaderBuilder(new FileReader(missingTxnBefore)).withSkipLines(1).build();
+                    List<String[]> csvData = csvReader.readAll();
+                    for (int i = 0; i < csvData.size(); i++) {
+                        String[] element = csvData.get(i);
+                        logger.info("Enter to insert Txn List File Total Data--{}", element[16]);
+                        if ((element[16].equals("WL002") && element[7].equals("00")) && (element[1].equals("00") || element[1].equals("02") || element[1].equals("37") || element[1].equals("39"))) {
+                            TxnListMainTotal transactionList = new TxnListMainTotal();
+                            transactionList.setMti(element[0]);
+                            transactionList.setTxnType(element[1]);
+                            transactionList.setTerminalId(element[2]);
+                            transactionList.setMerchantId(element[3]);
+                            transactionList.setTxnDate(element[4]);
+                            transactionList.setTxnTime(element[5]);
+                            transactionList.setTxnAmount(element[6]);
+                            transactionList.setTxnResponseCode(element[7]);
+                            transactionList.setResponseReceivedTime(element[8]);
+                            transactionList.setRrn(element[9]);
+                            transactionList.setStan(element[10]);
+                            transactionList.setInvoiceNumber(element[11]);
+                            transactionList.setBatchNumber(element[12]);
+                            transactionList.setUrn(element[13]);
+                            transactionList.setAuthResponseCode(element[14]);
+                            transactionList.setTxnAdditionalAmount(element[15]);
+                            transactionList.setInstitutionId(element[16]);
+                            missingTxnListDataList.add(transactionList);
                         }
                     }
-                    fileReader.close();
+                    csvReader.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -1012,18 +986,26 @@ public class AtfFileServiceImpl implements AtfFileService {
     }
 
     @Override
-    public void generateMissingATFFileTxn() throws IOException, ParseException {
+    public void generateMissingATFFileTxn(String date) throws IOException, ParseException {
 //        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
 //        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated.txt";
 
-        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
+//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
+
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ date + ".txt";
 
 
-        String atfFileSheet = "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
+        String atfFileSheet = "All_Txn_File_Updated-" + date + ".txt";
         String[] addressesArr = new String[1];
 
-        String date1 = DateUtil.allTxnDate().concat(" 23:00:00");
-        String date2 = DateUtil.allTxnDate2().concat(" 23:00:00");
+        DateDto mainTotal = txnListMainTotalRepository.findByDates();
+
+        String minDate = mainTotal.getMinDate();
+        String maxDate = mainTotal.getMaxDate();
+        logger.info("Min & Max Dates ----{}--{}",minDate,maxDate);
+        String date1 = DateUtil.splitDateTime(minDate).concat(" 23:00:00");
+        String date2 = DateUtil.minusOneDay(DateUtil.splitDateTime(maxDate)).concat(" 23:00:00");
+        logger.info("Date Filter to generate missing RRN --{} ----{}",date1,date2);
 
 //        String date1 = "2023-10-13".concat(" 23:00:00");
 //        String date2 = "2023-10-14".concat(" 23:00:00");
@@ -1104,6 +1086,12 @@ public class AtfFileServiceImpl implements AtfFileService {
             }
         }
         return status;
+    }
+
+    @Override
+    public Boolean beforeCheck() {
+        txnListMainTotalRepository.deleteAll();
+        return  true;
     }
 
 

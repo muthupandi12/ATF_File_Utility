@@ -74,7 +74,6 @@ public class DateUtil {
 
     public static String currentDate1() {
         Calendar cal = Calendar.getInstance();
-//         cal.add(Calendar.DATE, -1);
         String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat);
         return currentDate;
     }
@@ -104,5 +103,27 @@ public class DateUtil {
     public static Date oneHourBeforeDate(Date date){
         Date newDate = DateUtils.addHours(date, -1);
         return newDate;
+    }
+
+    public static String addOneDay(String date) throws ParseException {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        Calendar c = Calendar.getInstance();
+        c.setTime(sdf.parse(date));
+        c.add(Calendar.DATE, 1);  // number of days to add
+        return sdf.format(c.getTime());
+    }
+
+    public static String minusOneDay(String date) throws ParseException {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        Calendar c = Calendar.getInstance();
+        c.setTime(sdf.parse(date));
+        c.add(Calendar.DATE, -1);  // number of days to minus
+        return sdf.format(c.getTime());
+    }
+
+    public static String splitDateTime(String date) throws ParseException {
+        Date original = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(date);
+        String newstr = new SimpleDateFormat("yyyy-MM-dd").format(original);
+        return  newstr;
     }
 }

@@ -24,30 +24,27 @@ public class MailHandler {
 
     @Value("${atf.file.report.path}")
     private String atfFileReportPath;
-    public void sendMail() {
+    public void sendMail(String date) {
         try {
-            Date date = new Date();
             MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
             helper.setFrom("reports@bijlipay.co.in");
             helper.setTo(Constants.SENT_TO);
-            helper.setSubject("ATF File Updated Report -" +DateUtil.dateToStringForMail(DateUtil.currentDate())+ "");
+            helper.setSubject("ATF File Updated Report -" + date + "");
             helper.setText(String.format("Dear All," + "\n\n" + "Greetings from Bijlipay!!" + "\n\n" + "" +
-                    " ATF File Updated Report - "+ DateUtil.dateToStringForMail(DateUtil.currentDate()) +" \n\n" + "Regards," + "\n" + "Team " +
+                    " ATF File Updated Report - "+ date +" \n\n" + "Regards," + "\n" + "Team " +
                     "Bijlipay\n\n Note :" +
                     "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
                     " write to us @ service@bijlipay.co.in."));
+
             FileSystemResource file = new FileSystemResource(atfFileReportPath + "All_Txn_File-" + DateUtil.allTxnDate() + ".csv");
 //            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt");
-            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "All_Txn_File_Updated-" +DateUtil.dateToStringForMail(DateUtil.currentDate())+ ".txt");
-
+            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "All_Txn_File_Updated-" + date + ".txt");
 //            helper.addAttachment(file.getFilename(), file);
             helper.addAttachment(file1.getFilename(), file1);
             sender.send(message);
         } catch (MessagingException e) {
             e.printStackTrace();
-        } catch (ParseException e) {
-            throw new RuntimeException(e);
         }
     }
 

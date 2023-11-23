@@ -72,6 +72,9 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport,Long> {
     @Query(value = "select t.terminal_id,t.merchant_id,t.pos_device_id,t.batch_number,t.card_holder_name,t.masked_card_number,t.transaction_mode,t.invoice_number,t.acquire_bank,t.card_type,t.card_network,t.card_issuer_country_code,t.amount,t.response_code,t.rrn,t.transaction_auth_code,t.transaction_date,t.response_date,t.transaction_id,t.org_transaction_id,t.transaction_type,t.status,t.stan,t.settlement_mode,t.settlement_status from atf_file_report_main t where t.rrn not in (select rrn from settlement_file_main)",nativeQuery = true)
     List<Object[]> findByMissingAllTxnAndSettlementData();
 
+    @Query(value = "select count(*) from atf_file_report_main ",nativeQuery = true)
+    int findTotalInsertedData();
+
 //    @Query("select rrn from atf_file_report_main where response_code ='00'")
 //    List<String> findByDataBasedOnRRN();
 }

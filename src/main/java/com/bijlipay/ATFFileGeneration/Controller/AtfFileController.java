@@ -19,6 +19,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api")
@@ -37,61 +38,73 @@ public class AtfFileController {
     @Autowired
     private AtfFileService atfFileService;
 
-    @GetMapping("/upload-atf-file")
-    public void uploadAtfFile() throws Exception {
+    @GetMapping("/upload-atf-file/{date}")
+    public ResponseEntity<?> uploadAtfFile(@PathVariable("date") String date) throws Exception {
         String allTxnDate = DateUtil.allTxnDate();
         String currentDate = DateUtil.currentDate1();
         boolean allTxnFileUpdated = false;
         boolean txnListBefore = false;
         boolean txnListAfter = false;
-//        String atfFile = atfFileReportPath + "All_Txn_File-" + allTxnDate + ".csv";
+        String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
 
-        String atfFile = atfFileReportPath + "All_Txn_File.csv";
-
-
+//        String atfFile = atfFileReportPath + "All_Txn_File.csv";
 //        String atfFile = atfFileReportPath + "All_Txn_File-2023-10-31.csv";
 //        String atfFile = atfFileReportPath + "ATFSettledTxn.csv";
 
-
-//        String missingTxnBefore = atfFileReportPath + "TransactionList_"+ allTxnDate + ".csv";
-//        String missingTxnAfter = atfFileReportPath + "TransactionList_"+ currentDate + ".csv";
+        String afterDate = DateUtil.addOneDay(date);
+        String missingTxnBefore = atfFileReportPath + "TransactionList_" + date + ".csv";
+        String missingTxnAfter = atfFileReportPath + "TransactionList_" + afterDate + ".csv";
 //
-        String missingTxnBefore = atfFileReportPath + "TransactionList-1.csv";
-        String missingTxnAfter = atfFileReportPath + "TransactionList1.csv";
+//        String missingTxnBefore = atfFileReportPath + "TransactionList-1.csv";
+//        String missingTxnAfter = atfFileReportPath + "TransactionList1.csv";
 
-        try {
-            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
-            txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
-            txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
-            if (allTxnFileUpdated) {
-                logger.info("All Txn File Data inserted in db Successfully----{}", atfFile);
-            }
-            if (txnListBefore) {
-                logger.info("Txn List File Before Data inserted in db Successfully----{}", missingTxnBefore);
-            }
-            if (txnListAfter) {
-                logger.info("Txn List File After Data inserted in db Successfully----{}", missingTxnAfter);
-            }
+        File atf = new File(atfFile);
+        File before = new File(missingTxnBefore);
+        File after = new File(missingTxnAfter);
+        if (atf.exists() && before.exists() && after.exists()) {
+            try {
+                Boolean beforeCheck = atfFileService.beforeCheck();
+                if (beforeCheck) {
+                    logger.info("Checking data present in before insert ");
+                }
+                allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+                txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
+                txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
+                if (allTxnFileUpdated) {
+                    logger.info("All Txn File Data inserted in db Successfully----{}", atfFile);
+                }
+                if (txnListBefore) {
+                    logger.info("Txn List File Before Data inserted in db Successfully----{}", missingTxnBefore);
+                }
+                if (txnListAfter) {
+                    logger.info("Txn List File After Data inserted in db Successfully----{}", missingTxnAfter);
+                }
 
-            List<AtfFileReport> atfFileReports =atfFileService.updateDataBasedOnTransId();
-            logger.info("Atf File All Rules Updated Successfully");
+                List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransId();
+                logger.info("Atf File All Rules Updated Successfully");
 
-            atfFileService.generateAtfFileReport();
-            atfFileService.generateMissingATFFileTxn();
-            Boolean remove =atfFileService.removeDataInDB();
-            if(remove){
-                logger.info("Remove Data in DB Successfully");
-            }
-            mailHandler.sendMail();
-            logger.info("Mail Send Successfully....");
+                atfFileService.generateAtfFileReport(date);
+                atfFileService.generateMissingATFFileTxn(date);
+                Boolean remove = atfFileService.removeDataInDB();
+                if (remove) {
+                    logger.info("Remove Data in DB Successfully");
+                }
+                mailHandler.sendMail(date);
+                logger.info("Mail Send Successfully....");
+
+
 //            String destinationPath = "/home/uat1/ATFFiles/";
 //            boolean upload = atfFileService.uploadFilesToSFTP(updatedAtfFilePath,destinationPath);
 //            if(upload){
 //                logger.info("File Moved SuccessFully---");
 //            }
 
-        } catch (Exception e) {
-            e.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "success"), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -109,43 +122,54 @@ public class AtfFileController {
     }
 
     @GetMapping("/upload-switch-txn-files")
-    public void uploadSwitchTxnFiles() throws Exception {
+    public ResponseEntity<?> uploadSwitchTxnFiles() throws Exception {
         String settlementDate = DateUtil.currentDate2();
-//        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_" + settlementDate + ".csv";
-//        String txnListFile = atfFileReportPath + "TransactionList_" + DateUtil.currentDate1() + ".csv";
+        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_" + settlementDate + ".csv";
+        String txnListFile = atfFileReportPath + "TransactionList_" + DateUtil.currentDate1() + ".csv";
 
-        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT.csv";
-        String txnListFile = atfFileReportPath + "TransactionList1.csv";
+//        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT.csv";
+//        String txnListFile = atfFileReportPath + "TransactionList1.csv";
         boolean settlementFileUpdated = false;
         boolean txnListFileUpdated = false;
-        String atfFile = atfFileReportPath + "All_Txn_File.csv";
+//        String atfFile = atfFileReportPath + "All_Txn_File.csv";
+
+        String atfFile = atfFileReportPath + "All_Txn_File-" + DateUtil.allTxnDate() + ".csv";
+
+        File atf = new File(atfFile);
+        File settlement = new File(settlementFile);
+        File txnList = new File(txnListFile);
+
+
         boolean allTxnFileUpdated = false;
-        try {
-            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
-            settlementFileUpdated = atfFileService.updatesettlementFileData(settlementFile);
-            txnListFileUpdated = atfFileService.updateTxnListData(txnListFile);
-            if (new File(settlementFile).exists() && new File(txnListFile).exists()) {
-                if (settlementFileUpdated) {
-                    logger.info("Settlement File Data inserted in db Successfully----{}", settlementFile);
+        if (atf.exists() && settlement.exists() && txnList.exists()) {
+            try {
+                allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+                settlementFileUpdated = atfFileService.updatesettlementFileData(settlementFile);
+                txnListFileUpdated = atfFileService.updateTxnListData(txnListFile);
+                if (new File(settlementFile).exists() && new File(txnListFile).exists()) {
+                    if (settlementFileUpdated) {
+                        logger.info("Settlement File Data inserted in db Successfully----{}", settlementFile);
+                    }
+                    if (txnListFileUpdated) {
+                        logger.info("Txn List File Data inserted in db Successfully----{}", txnListFile);
+                    }
+                    if (allTxnFileUpdated) {
+                        logger.info("All Txn File Data inserted in db Successfully----{}", txnListFile);
+                    }
                 }
-                if (txnListFileUpdated) {
-                    logger.info("Txn List File Data inserted in db Successfully----{}", txnListFile);
+                atfFileService.generateAllTxnFileMissingDataFile();
+                atfFileService.generateSettlementFileMissingDataFile();
+                atfFileService.generateTxnAndSettlementMissingFile();
+                Boolean remove = atfFileService.removeDataInDB1();
+                if (remove) {
+                    logger.info("Remove Data in DB Successfully");
                 }
-                if (allTxnFileUpdated) {
-                    logger.info("All Txn File Data inserted in db Successfully----{}", txnListFile);
-                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            atfFileService.generateAllTxnFileMissingDataFile();
-            atfFileService.generateSettlementFileMissingDataFile();
-            atfFileService.generateTxnAndSettlementMissingFile();
-            Boolean remove =atfFileService.removeDataInDB1();
-            if(remove){
-                logger.info("Remove Data in DB Successfully");
-            }
-//            mailHandler.sendTotalFileMail();
-//            logger.info("Send All Switch Txn Files Successfully");
-        } catch (Exception e) {
-            e.printStackTrace();
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

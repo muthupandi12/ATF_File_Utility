@@ -17,7 +17,7 @@ public interface AtfFileService {
 
     Boolean removeDataInDB();
 
-    void generateAtfFileReport() throws IOException, ParseException;
+    void generateAtfFileReport(String date) throws IOException, ParseException;
 
     List<AtfFileReport> getAtfFileData(Optional<String> searchTerm);
 
@@ -40,9 +40,11 @@ public interface AtfFileService {
 
     boolean updateTxnListTotalData(String missingTxnBefore);
 
-    void generateMissingATFFileTxn() throws IOException, ParseException;
+    void generateMissingATFFileTxn(String date) throws IOException, ParseException;
 
     boolean uploadFilesToSFTP(String updatedAtfFilePath, String destinationPath);
+
+    Boolean beforeCheck();
 }
 
 

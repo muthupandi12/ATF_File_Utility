@@ -7,7 +7,7 @@ import java.util.Date;
 @Table(name = "atf_file_report_main")
 public class AtfFileReport {
 
-     @Id
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id",nullable = false)
     private long id;
