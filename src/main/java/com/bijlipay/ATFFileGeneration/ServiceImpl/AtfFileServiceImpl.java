@@ -160,7 +160,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 //        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
 //        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
 
-        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ date + ".txt";
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + date + ".txt";
 
         String atfFileSheet = "All_Txn_File_Updated-" + date + ".txt";
         List<Object[]> atf = null;
@@ -218,7 +218,7 @@ public class AtfFileServiceImpl implements AtfFileService {
             } else if (i == 15) {
                 addressesArr[0] = "Rule 16- SALE and UPI transactions with ACK or HOST with responsecode 00 but marked as not settled with corresponding VOID or Reversal in transactionDate before 23:00:00";
                 atf = atfFileRepository.findByAtfFileDataRule16();
-            }else if (i == 16) {
+            } else if (i == 16) {
                 addressesArr[0] = "Rule 17- Rules Not Verified because Data alignment issues Data";
                 atf = atfFileRepository.findByAtfFileDataRule17();
             }
@@ -438,15 +438,15 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     String oneHourDate = DateUtil.dateToString(update.get(1).getTransactionDate());
 //                                    logger.info("One Hour Date --{}", oneHourDate);
 //                                    logger.info("After One --{}",DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()));
-                                        if (update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()))) {
-                                            if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
-                                                if (((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("NotSettled")) || update.get(0).getSettlementStatus().equals("NotSettled")) {
-                                                    update.get(0).setSettledTxnWrongCorrespondingVoidOrReversal(true);
-                                                    update.get(1).setSettledTxnWrongCorrespondingVoidOrReversal(true);
-                                                }
+                                    if (update.get(1).getTransactionDate().before(DateUtil.oneHourBeforeDate(update.get(1).getTransactionDate()))) {
+                                        if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
+                                            if (((update.get(1).getStatus().equals("ACK") || update.get(1).getStatus().equals("HOST")) && update.get(1).getResponseCode().equals("00") && update.get(1).getSettlementStatus().equals("NotSettled")) || update.get(0).getSettlementStatus().equals("NotSettled")) {
+                                                update.get(0).setSettledTxnWrongCorrespondingVoidOrReversal(true);
+                                                update.get(1).setSettledTxnWrongCorrespondingVoidOrReversal(true);
                                             }
                                         }
                                     }
+                                }
                             } catch (ParseException e) {
                                 throw new RuntimeException(e);
                             }
@@ -548,14 +548,14 @@ public class AtfFileServiceImpl implements AtfFileService {
 
                     if (update.get(0).getTransactionType().equals("Sale") || update.get(0).getTransactionType().equals("UPI") || update.get(0).getTransactionType().equals("Void")) {
                         if (!(update.get(1).getStatus().equals("INIT"))) {
-                            if ((update.get(1).getResponseDate() == null) || (update.get(1).getTransactionDate() == null)) {
+                            if ((update.get(1).getResponseDate() == null) || (update.get(1).getTransactionDate() == null) || (update.get(0).getResponseDate() == null) || (update.get(0).getTransactionDate() == null)) {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             } else if ((update.get(1).getResponseDate().before(update.get(1).getTransactionDate())) || (update.get(0).getResponseDate().before(update.get(0).getTransactionDate()))) {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             }
-                            if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                 String date = null;
                                 try {
                                     date = DateUtil.dateComparison(DateUtil.currentDate());
@@ -583,7 +583,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     update.get(0).setResponseDateCheck(true);
                                     update.get(1).setResponseDateCheck(true);
                                 }
-                                if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                    if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                     String date = null;
                                     try {
                                         date = DateUtil.dateComparison(DateUtil.currentDate());
@@ -612,7 +612,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             }
-                            if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                 String date = null;
                                 try {
                                     date = DateUtil.dateComparison(DateUtil.currentDate());
@@ -640,7 +640,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     update.get(0).setResponseDateCheck(true);
                                     update.get(1).setResponseDateCheck(true);
                                 }
-                                if(update.get(0).getTransactionDate() !=null && update.get(1).getTransactionDate() !=null) {
+                                    if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                     String date = null;
                                     try {
                                         date = DateUtil.dateComparison(DateUtil.currentDate());
@@ -668,9 +668,9 @@ public class AtfFileServiceImpl implements AtfFileService {
                 fileReport.setRulesVerifiedStatus(true);
                 if (fileReport.getTransactionType().equals("Sale") || fileReport.getTransactionType().equals("UPI") || fileReport.getTransactionType().equals("Void")) {
                     if (!(fileReport.getStatus().equals("INIT"))) {
-                        String date =null;
+                        String date = null;
                         try {
-                           date = DateUtil.dateComparison(DateUtil.currentDate());
+                            date = DateUtil.dateComparison(DateUtil.currentDate());
                         } catch (ParseException e) {
                             throw new RuntimeException(e);
                         }
@@ -681,7 +681,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                             logger.info(SINGLE_VALUE + " Checking ResponseDate --{}", fileReport.getTransactionId());
                             fileReport.setResponseDateCheck(true);
                         }
-                        if(fileReport.getTransactionDate() !=null) {
+                        if (fileReport.getTransactionDate() != null && fileReport.getResponseDate() !=null) {
                             try {
                                 String date1 = DateUtil.dateComparison(fileReport.getTransactionDate());
 //                                logger.info("Comparison Date --{}", date1);
@@ -748,7 +748,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                         }
                     }
                 }
-                if (fileReport.getTransactionType().equals("Void") || fileReport.getTransactionType().equals("Reversal") ) {
+                if (fileReport.getTransactionType().equals("Void") || fileReport.getTransactionType().equals("Reversal")) {
                     fileReport.setOnlyVoidReversalWithoutSaleOrUPI(true);
                 }
                 if (fileReport.getTransactionType().equals("Sale")) {
@@ -771,13 +771,13 @@ public class AtfFileServiceImpl implements AtfFileService {
         List<AtfFileReport> totalList = atfFileRepository.findByTransIdTotalList(transId);
         logger.info("After Split up data Size --{}", totalList.size());
         List<AtfFileReport> singleEntry = new ArrayList<>();
-        transId.forEach(l->{
+        transId.forEach(l -> {
             List<AtfFileReport> update = totalList.stream().filter(t -> t.getTransactionId().equals(l) || t.getOrgTransactionId().equals(l)).collect(Collectors.toList());
-            if(update.size() ==1){
+            if (update.size() == 1) {
                 logger.info("Single Transaction Id List--{}", update.size());
                 AtfFileReport fileReport = totalList.stream().filter(p -> p.getOrgTransactionId().equals(l)).findAny().orElse(null);
                 fileReport.setRulesVerifiedStatus(true);
-                if (fileReport.getTransactionType().equals("Void") || fileReport.getTransactionType().equals("Reversal") ) {
+                if (fileReport.getTransactionType().equals("Void") || fileReport.getTransactionType().equals("Reversal")) {
                     fileReport.setOnlyVoidReversalWithoutSaleOrUPI(true);
                 }
                 singleEntry.add(fileReport);
@@ -987,12 +987,9 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Override
     public void generateMissingATFFileTxn(String date) throws IOException, ParseException {
-//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt";
-//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated.txt";
+        //        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
 
-//        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ DateUtil.dateToStringForMail(DateUtil.currentDate()) + ".txt";
-
-        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-"+ date + ".txt";
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + date + ".txt";
 
 
         String atfFileSheet = "All_Txn_File_Updated-" + date + ".txt";
@@ -1002,10 +999,10 @@ public class AtfFileServiceImpl implements AtfFileService {
 
         String minDate = mainTotal.getMinDate();
         String maxDate = mainTotal.getMaxDate();
-        logger.info("Min & Max Dates ----{}--{}",minDate,maxDate);
+        logger.info("Min & Max Dates ----{}--{}", minDate, maxDate);
         String date1 = DateUtil.splitDateTime(minDate).concat(" 23:00:00");
         String date2 = DateUtil.minusOneDay(DateUtil.splitDateTime(maxDate)).concat(" 23:00:00");
-        logger.info("Date Filter to generate missing RRN --{} ----{}",date1,date2);
+        logger.info("Date Filter to generate missing RRN --{} ----{}", date1, date2);
 
 //        String date1 = "2023-10-13".concat(" 23:00:00");
 //        String date2 = "2023-10-14".concat(" 23:00:00");
@@ -1040,7 +1037,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 
             this.mSSHSession.connect();
 
-            logger.info("Connected Success! for the path {}",sourcePath);
+            logger.info("Connected Success! for the path {}", sourcePath);
             this.mChannelSftp = (ChannelSftp) this.mSSHSession.openChannel("sftp");
 
             this.mChannelSftp.connect();
@@ -1052,18 +1049,18 @@ public class AtfFileServiceImpl implements AtfFileService {
                 mChannelSftp.cd(destination);
                 File paths = new File(sourcePath);
                 String[] files = paths.list();
-                for (String fileName:files){
-                    logger.info("upload file Name {} ",fileName);
-                    mChannelSftp.put(sourcePath+"/"+fileName,destination);
+                for (String fileName : files) {
+                    logger.info("upload file Name {} ", fileName);
+                    mChannelSftp.put(sourcePath + "/" + fileName, destination);
                     logger.info("uploaded");
                 }
                 status = true;
 //                logger.info("upload Success! ");
                 if (status) {
-                    logger.info("Moved Success! destination- {}-{}",sourcePath,status);
+                    logger.info("Moved Success! destination- {}-{}", sourcePath, status);
                     return status;
                 } else {
-                    logger.info("Not Moved! {}",status);
+                    logger.info("Not Moved! {}", status);
                     return false;
                 }
 
@@ -1091,11 +1088,11 @@ public class AtfFileServiceImpl implements AtfFileService {
     @Override
     public Boolean beforeCheck() {
         txnListMainTotalRepository.deleteAll();
-        return  true;
+        return true;
     }
 
 
-    public boolean uploadMicro(String sourcePath,String destination) {
+    public boolean uploadMicro(String sourcePath, String destination) {
 
         boolean connectionStatus = false;
         boolean status = false;
@@ -1118,7 +1115,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 
             this.mSSHSession.connect();
 
-            logger.info("Connected Success! for the path {}",sourcePath);
+            logger.info("Connected Success! for the path {}", sourcePath);
             this.mChannelSftp = (ChannelSftp) this.mSSHSession.openChannel("sftp");
 
             this.mChannelSftp.connect();
@@ -1130,18 +1127,18 @@ public class AtfFileServiceImpl implements AtfFileService {
                 mChannelSftp.cd(destination);
                 File paths = new File(sourcePath);
                 String[] files = paths.list();
-                for (String fileName:files){
-                    logger.info("upload file Name {} ",fileName);
-                    mChannelSftp.put(sourcePath+"/"+fileName,destination);
+                for (String fileName : files) {
+                    logger.info("upload file Name {} ", fileName);
+                    mChannelSftp.put(sourcePath + "/" + fileName, destination);
                     logger.info("uploaded");
                 }
                 status = true;
                 logger.info("upload Success! ");
                 if (status) {
-                    logger.info("Moved Success! destination- {}-{}",sourcePath,status);
+                    logger.info("Moved Success! destination- {}-{}", sourcePath, status);
                     return status;
                 } else {
-                    logger.info("Not Moved! {}",status);
+                    logger.info("Not Moved! {}", status);
                     return false;
                 }
 
@@ -1165,9 +1162,6 @@ public class AtfFileServiceImpl implements AtfFileService {
         }
         return status;
     }
-
-
-
 
 
 }

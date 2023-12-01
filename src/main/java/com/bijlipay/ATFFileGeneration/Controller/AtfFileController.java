@@ -9,17 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api")
@@ -47,16 +43,13 @@ public class AtfFileController {
         boolean txnListAfter = false;
         String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
 
-//        String atfFile = atfFileReportPath + "All_Txn_File.csv";
-//        String atfFile = atfFileReportPath + "All_Txn_File-2023-10-31.csv";
-//        String atfFile = atfFileReportPath + "ATFSettledTxn.csv";
+//        String atfFile = atfFileReportPath + "All_Txn_File-2023-11-06.csv";
 
         String afterDate = DateUtil.addOneDay(date);
         String missingTxnBefore = atfFileReportPath + "TransactionList_" + date + ".csv";
         String missingTxnAfter = atfFileReportPath + "TransactionList_" + afterDate + ".csv";
-//
-//        String missingTxnBefore = atfFileReportPath + "TransactionList-1.csv";
-//        String missingTxnAfter = atfFileReportPath + "TransactionList1.csv";
+
+        logger.info("Files -- ATF -- Txn Before --- Txn After --{}--{}--{}",atfFile,missingTxnBefore,missingTxnAfter);
 
         File atf = new File(atfFile);
         File before = new File(missingTxnBefore);

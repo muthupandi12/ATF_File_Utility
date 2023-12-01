@@ -72,6 +72,12 @@ public class DateUtil {
         return dateFormatter.format(date);
     }
 
+
+//    public static String dateComparison(Date date) throws ParseException {
+//        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy");
+//        return dateFormatter.format(date);
+//    }
+
     public static String currentDate1() {
         Calendar cal = Calendar.getInstance();
         String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat);
