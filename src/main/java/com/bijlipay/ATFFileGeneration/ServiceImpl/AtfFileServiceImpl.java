@@ -24,18 +24,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.nio.channels.Channel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.*;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.bijlipay.ATFFileGeneration.Util.Constants.*;
 
@@ -64,6 +63,13 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Value("${atf.file.updated.path}")
     private String updatedAtfFilePath;
+
+    @Value("${switch.datasource.url}")
+    private String switchUrl;
+    @Value("${switch.datasource.username}")
+    private String username;
+    @Value("${switch.datasource.password}")
+    private String password;
 
     private static final Logger logger = LoggerFactory.getLogger(AtfFileServiceImpl.class);
 
@@ -139,7 +145,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                 try {
                     atfFileRepository.saveAll(allTxnFiles);
                     updated = true;
-                    logger.info("AllTxn File Data Inserted Successfully----!!!");
+//                    logger.info("AllTxn File Data Inserted Successfully----!!!");
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -150,8 +156,8 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Override
     public Boolean removeDataInDB() {
-        atfFileRepository.deleteAll();
-        txnListMainTotalRepository.deleteAll();
+        atfFileRepository.removeATFFileData();
+        txnListMainTotalRepository.removeTxnListData();
         return true;
     }
 
@@ -248,7 +254,7 @@ public class AtfFileServiceImpl implements AtfFileService {
     }
 
     @Override
-    public List<AtfFileReport> updateDataBasedOnTransId() {
+    public List<AtfFileReport> updateDataBasedOnTransId(String requestDate) {
         List<String> transactionId = atfFileRepository.findAllTransId();
         List<String> voidOrReversalCase = atfFileRepository.findAllTransIdForVoidOrReversal();
         logger.info("Transaction Id List Size --{}", transactionId.size());
@@ -258,7 +264,7 @@ public class AtfFileServiceImpl implements AtfFileService {
             count++;
             List<String> sub = transactionId.subList(i, Math.min(transactionId.size(), i + 500));
             logger.info("Loop Count For Sale AND UPI with Last TransactionId--- {}---- {}", count, sub.get(sub.size() - 1));
-            threadExecution(sub);
+            threadExecution(sub, requestDate);
         }
         for (int i = 0; i < voidOrReversalCase.size(); i += 500) {
             count++;
@@ -270,7 +276,7 @@ public class AtfFileServiceImpl implements AtfFileService {
     }
 
 
-    public void threadExecution(List<String> transId) throws RuntimeException {
+    public void threadExecution(List<String> transId, String requestDate) throws RuntimeException {
         List<AtfFileReport> totalList = atfFileRepository.findByTransIdTotalList(transId);
         logger.info("After Split up data Size --{}", totalList.size());
         List<AtfFileReport> singleEntry = new ArrayList<>();
@@ -555,15 +561,20 @@ public class AtfFileServiceImpl implements AtfFileService {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             }
-                                if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
+                            if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                 String date = null;
+                                String out = null;
                                 try {
                                     date = DateUtil.dateComparison(DateUtil.currentDate());
+                                    String index[] = requestDate.split("-");
+//                                    logger.info("index1 {}----index2 {}",index[0],index[1]);
+                                    out = index[0] + "-" + index[1];
+//                                    logger.info("finalDate --{}",out);
                                 } catch (ParseException e) {
                                     throw new RuntimeException(e);
                                 }
                                 try {
-                                    if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                    if ((!out.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
                                         update.get(0).setResponseDateMismatch(true);
                                         update.get(1).setResponseDateMismatch(true);
                                     }
@@ -583,15 +594,20 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     update.get(0).setResponseDateCheck(true);
                                     update.get(1).setResponseDateCheck(true);
                                 }
-                                    if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
+                                if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                     String date = null;
+                                    String out = null;
                                     try {
                                         date = DateUtil.dateComparison(DateUtil.currentDate());
+                                        String index[] = requestDate.split("-");
+//                                        logger.info("index1 {}----index2 {}",index[0],index[1]);
+                                        out = index[0] + "-" + index[1];
+//                                        logger.info("finalDate --{}",out);
                                     } catch (ParseException e) {
                                         throw new RuntimeException(e);
                                     }
                                     try {
-                                        if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                        if ((!out.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
                                             update.get(0).setResponseDateMismatch(true);
                                             update.get(1).setResponseDateMismatch(true);
                                         }
@@ -612,15 +628,20 @@ public class AtfFileServiceImpl implements AtfFileService {
                                 update.get(0).setResponseDateCheck(true);
                                 update.get(1).setResponseDateCheck(true);
                             }
-                                if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
+                            if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                 String date = null;
+                                String out = null;
                                 try {
                                     date = DateUtil.dateComparison(DateUtil.currentDate());
+                                    String index[] = requestDate.split("-");
+//                                    logger.info("index1 {}----index2 {}",index[0],index[1]);
+                                    out = index[0] + "-" + index[1];
+//                                    logger.info("finalDate --{}",out);
                                 } catch (ParseException e) {
                                     throw new RuntimeException(e);
                                 }
                                 try {
-                                    if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                    if ((!out.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
                                         update.get(0).setResponseDateMismatch(true);
                                         update.get(1).setResponseDateMismatch(true);
                                     }
@@ -640,15 +661,20 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     update.get(0).setResponseDateCheck(true);
                                     update.get(1).setResponseDateCheck(true);
                                 }
-                                    if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
+                                if (update.get(0).getTransactionDate() != null && update.get(1).getTransactionDate() != null && update.get(0).getResponseDate() != null && update.get(1).getResponseDate() != null) {
                                     String date = null;
+                                    String out = null;
                                     try {
                                         date = DateUtil.dateComparison(DateUtil.currentDate());
+                                        String index[] = requestDate.split("-");
+//                                        logger.info("index1 {}----index2 {}",index[0],index[1]);
+                                        out = index[0] + "-" + index[1];
+//                                        logger.info("finalDate --{}",out);
                                     } catch (ParseException e) {
                                         throw new RuntimeException(e);
                                     }
                                     try {
-                                        if ((!date.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
+                                        if ((!out.equals(DateUtil.dateComparison(update.get(0).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(0).getResponseDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(update.get(1).getResponseDate())))) {
                                             update.get(0).setResponseDateMismatch(true);
                                             update.get(1).setResponseDateMismatch(true);
                                         }
@@ -669,8 +695,13 @@ public class AtfFileServiceImpl implements AtfFileService {
                 if (fileReport.getTransactionType().equals("Sale") || fileReport.getTransactionType().equals("UPI") || fileReport.getTransactionType().equals("Void")) {
                     if (!(fileReport.getStatus().equals("INIT"))) {
                         String date = null;
+                        String out = null;
                         try {
                             date = DateUtil.dateComparison(DateUtil.currentDate());
+                            String index[] = requestDate.split("-");
+//                            logger.info("index1 {}----index2 {}",index[0],index[1]);
+                            out = index[0] + "-" + index[1];
+//                            logger.info("finalDate --{}",out);
                         } catch (ParseException e) {
                             throw new RuntimeException(e);
                         }
@@ -681,11 +712,11 @@ public class AtfFileServiceImpl implements AtfFileService {
                             logger.info(SINGLE_VALUE + " Checking ResponseDate --{}", fileReport.getTransactionId());
                             fileReport.setResponseDateCheck(true);
                         }
-                        if (fileReport.getTransactionDate() != null && fileReport.getResponseDate() !=null) {
+                        if (fileReport.getTransactionDate() != null && fileReport.getResponseDate() != null) {
                             try {
                                 String date1 = DateUtil.dateComparison(fileReport.getTransactionDate());
 //                                logger.info("Comparison Date --{}", date1);
-                                if ((!date.equals(DateUtil.dateComparison(fileReport.getTransactionDate()))) || (!date.equals(DateUtil.dateComparison(fileReport.getResponseDate())))) {
+                                if ((!out.equals(DateUtil.dateComparison(fileReport.getTransactionDate()))) || (!out.equals(DateUtil.dateComparison(fileReport.getResponseDate())))) {
                                     fileReport.setResponseDateMismatch(true);
                                 }
                             } catch (ParseException e) {
@@ -913,9 +944,9 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Override
     public Boolean removeDataInDB1() {
-        atfFileRepository.deleteAll();
-        settlementFileRepository.deleteAll();
-        transactionListRepository.deleteAll();
+        atfFileRepository.removeATFFileData();
+        settlementFileRepository.removeSettlementData();
+        transactionListRepository.removeTxnListDataOnly();
         return true;
     }
 
@@ -1089,6 +1120,127 @@ public class AtfFileServiceImpl implements AtfFileService {
     public Boolean beforeCheck() {
         txnListMainTotalRepository.deleteAll();
         return true;
+    }
+
+    @Override
+    public List<AtfFileReport> updateDataBasedOnTransIdReversalOnly() {
+        List<String> transactionId = atfFileRepository.findAllTransId();
+        logger.info("Transaction Id List Size --{}", transactionId.size());
+        logger.info("Void Or Reversal Transaction Id List Size --{}", transactionId.size());
+        int count = 0;
+        for (int i = 0; i < transactionId.size(); i += 500) {
+            count++;
+            List<String> sub = transactionId.subList(i, Math.min(transactionId.size(), i + 500));
+            logger.info("Loop Count For Sale AND UPI with Last TransactionId--- {}---- {}", count, sub.get(sub.size() - 1));
+            threadExecutionForReversalEntry(sub);
+        }
+        return null;
+    }
+
+    @Override
+    public List<String> processReversalEntry(String date) {
+        File updatedAtfFile = new File(updatedAtfFilePath + "/All_Txn_File_Updated-" + date + ".csv");
+        String atfFileSheet = "All_Txn_File_Updated-" + date + ".csv";
+        List<String> reversalEntry = atfFileRepository.findReversalEntry();
+        List<Object[]> result = atfFileRepository.findByWithoutReversalEntry(reversalEntry);
+
+        ReportUtil.generateAtfFileData(result, Constants.ATF_FILE_HEADER, updatedAtfFile, atfFileSheet);
+
+        return null;
+    }
+
+    @Override
+    public void generateAtfFileReportForReversalEntry(String date) throws IOException {
+        String updatedAtfFile = updatedAtfFilePath + "/All_Txn_File_Updated-" + date + ".txt";
+        String atfFileSheet = "All_Txn_File_Updated-" + date + ".txt";
+        List<Object[]> atf = null;
+        for (int i = 0; i < 1; i++) {
+            String[] addressesArr = new String[1];
+            addressesArr[0] = "Reversals corresponding SALE/ UPI transaction in ACK status";
+            atf = atfFileRepository.findByAtfFileDataRule8();
+            ReportUtil.generateAtfFileReportInTextFile(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
+        }
+    }
+
+    @Override
+    public Boolean removeATFFileRecord() {
+        atfFileRepository.removeATFFileData();
+        return true;
+    }
+
+    public Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(switchUrl, username, password);
+    }
+
+    @Override
+    public void processQueryExecution(String filepath) throws FileNotFoundException, SQLException {
+        BufferedReader reader = new BufferedReader(new FileReader(filepath));
+        Stream<String> lines = reader.lines().skip(2);
+        List<String> transactionId = new ArrayList<>();
+        lines.forEachOrdered(line -> {
+            transactionId.add(line);
+        });
+        logger.info("Transaction Id List Size--{}", transactionId.size());
+        Connection con = null;
+        Statement stmt = null;
+        String txnId = transactionId.stream().collect(Collectors.joining("','", "'", "'"));
+        try {
+            con = getConnection();
+            stmt = con.createStatement();
+            String insertQuery = "INSERT INTO notification_data_Rev SELECT * FROM notification_data where OrgTransactionId IN (" + txnId + ")";
+            String deleteQuery = "delete FROM notification_data where OrgTransactionId IN (" + txnId + ")";
+            String updateQuery = "update notification_data set settlement_status='Settled' where transactionId IN("+txnId+") and NotificationType='ACK';";
+            int insert = stmt.executeUpdate(insertQuery);
+            logger.info("Reversal With ACK Data Insert SuccessFully --{}",insert);
+            int delete  = stmt.executeUpdate(deleteQuery);
+            logger.info("Reversal With ACK Data Deleted SuccessFully --{}",delete);
+            int update = stmt.executeUpdate(updateQuery);
+            logger.info("Reversal With ACK Data Insert SuccessFully --{}",update);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (con != null) {
+                con.close();
+            }
+        }
+
+    }
+
+    private void threadExecutionForReversalEntry(List<String> transId) {
+        List<AtfFileReport> totalList = atfFileRepository.findByTransIdTotalList(transId);
+        logger.info("After Split up data Size --{}", totalList.size());
+        List<AtfFileReport> doubleEntry = new ArrayList<>();
+        transId.forEach(l -> {
+            List<AtfFileReport> update = totalList.stream().filter(t -> t.getTransactionId().equals(l) || t.getOrgTransactionId().equals(l)).collect(Collectors.toList());
+            if (update.size() > 1) {
+                logger.info("Double Transaction Id List --{}", update.size());
+                update.get(0).setRulesVerifiedStatus(true);
+                update.get(1).setRulesVerifiedStatus(true);
+                if ((update.get(0).getTransactionType().equals("Void") || update.get(0).getTransactionType().equals("Reversal")) || (update.get(1).getTransactionType().equals("Void") || update.get(1).getTransactionType().equals("Reversal"))) {
+                    if ((update.get(0).getTransactionType().equals("Reversal")) || (update.get(1).getTransactionType().equals("Reversal"))) {
+                        if (update.get(0).getTransactionType().equals("Sale") || update.get(0).getTransactionType().equals("UPI")) {
+                            if ((update.get(0).getStatus().equals("ACK"))) {
+                                logger.info(DOUBLE_VALUE + " Checking Reversal Corresponding Ack Status Wrong---{}", update.get(0).getTransactionId());
+                                update.get(0).setReversalAndAckStatus(true);
+                                update.get(1).setReversalAndAckStatus(true);
+                            }
+                        } else {
+                            if (update.get(1).getTransactionType().equals("Sale") || update.get(1).getTransactionType().equals("UPI")) {
+                                if (update.get(1).getStatus().equals("ACK")) {
+                                    logger.info(DOUBLE_VALUE + " Checking Reversal Corresponding Ack Status Wrong---{}", update.get(1).getTransactionId());
+                                    update.get(0).setReversalAndAckStatus(true);
+                                    update.get(1).setReversalAndAckStatus(true);
+                                }
+                            }
+                        }
+                    }
+                }
+                doubleEntry.addAll(update);
+            }
+        });
+        atfFileRepository.saveAll(doubleEntry);
+        logger.info("Rules Updated Successfully---");
     }
 
 

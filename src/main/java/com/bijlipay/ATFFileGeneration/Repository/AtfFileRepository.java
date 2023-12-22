@@ -4,9 +4,11 @@ import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
 import com.bijlipay.ATFFileGeneration.Util.Constants;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import javax.transaction.Transactional;
 import java.util.List;
 
 @Repository
@@ -49,7 +51,7 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport,Long> {
     List<Object[]> findByAtfFileDataRule15();
 
 
-    @Query(value = "select t.org_transaction_id from atf_file_report_main t where t.rules_verified_status =0 ",nativeQuery = true)
+    @Query(value = "select t.transaction_id from atf_file_report_main t where t.rules_verified_status =0 ",nativeQuery = true)
     List<Object[]> findByAtfFileDataRule17();
     @Query(value = "select a from AtfFileReport a where a.transactionId =?1")
     List<AtfFileReport> getDataWithSearchTerm(String searchTerm);
@@ -74,6 +76,18 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport,Long> {
 
     @Query(value = "select count(*) from atf_file_report_main ",nativeQuery = true)
     int findTotalInsertedData();
+
+    @Query(value = "select t.transaction_id from atf_file_report_main t where t.reversal_and_ack_status =1 and t.transaction_type in ('Reversal') ",nativeQuery = true)
+    List<String> findReversalEntry();
+
+    @Query(value = "select terminal_id,merchant_id,pos_device_id,batch_number,card_holder_name,masked_card_number,transaction_mode,invoice_number,acquire_bank,card_type,card_network,card_issuer_country_code,amount,response_code,rrn,transaction_auth_code,transaction_date,response_date,transaction_id,org_transaction_id,transaction_type,status,stan,settlement_mode,settlement_status from atf_file_report_main where transaction_id not in(?1)",nativeQuery = true)
+    List<Object[]> findByWithoutReversalEntry(List<String> reversalEntry);
+
+    @Transactional
+    @Modifying
+    @Query(value = "Truncate table atf_file_report_main", nativeQuery = true)
+    void removeATFFileData();
+
 
 //    @Query("select rrn from atf_file_report_main where response_code ='00'")
 //    List<String> findByDataBasedOnRRN();

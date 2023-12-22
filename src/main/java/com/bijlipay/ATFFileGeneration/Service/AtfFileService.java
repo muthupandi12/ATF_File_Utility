@@ -5,7 +5,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.List;
 import java.util.Optional;
@@ -23,7 +25,7 @@ public interface AtfFileService {
 
     AtfFileReport updateAtfDataBasedOnTransId(String transactionId,AtfFileReport atfRequest);
 
-    List<AtfFileReport> updateDataBasedOnTransId();
+    List<AtfFileReport> updateDataBasedOnTransId(String date);
 
     boolean updatesettlementFileData(String settlementFile);
 
@@ -45,6 +47,16 @@ public interface AtfFileService {
     boolean uploadFilesToSFTP(String updatedAtfFilePath, String destinationPath);
 
     Boolean beforeCheck();
+
+    List<AtfFileReport> updateDataBasedOnTransIdReversalOnly();
+
+    List<String> processReversalEntry(String date);
+
+    void generateAtfFileReportForReversalEntry(String date) throws IOException;
+
+    Boolean removeATFFileRecord();
+
+    void processQueryExecution(String filepath) throws FileNotFoundException, SQLException;
 }
 
 

@@ -12,8 +12,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,13 +48,13 @@ public class AtfFileController {
         boolean txnListAfter = false;
         String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
 
-//        String atfFile = atfFileReportPath + "All_Txn_File-2023-11-06.csv";
+//        String atfFile = atfFileReportPath + "All_Txn_File_Staged_367.csv";
 
         String afterDate = DateUtil.addOneDay(date);
         String missingTxnBefore = atfFileReportPath + "TransactionList_" + date + ".csv";
         String missingTxnAfter = atfFileReportPath + "TransactionList_" + afterDate + ".csv";
 
-        logger.info("Files -- ATF -- Txn Before --- Txn After --{}--{}--{}",atfFile,missingTxnBefore,missingTxnAfter);
+        logger.info("Files -- ATF -- Txn Before --- Txn After --{}--{}--{}", atfFile, missingTxnBefore, missingTxnAfter);
 
         File atf = new File(atfFile);
         File before = new File(missingTxnBefore);
@@ -73,7 +78,7 @@ public class AtfFileController {
                     logger.info("Txn List File After Data inserted in db Successfully----{}", missingTxnAfter);
                 }
 
-                List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransId();
+                List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransId(date);
                 logger.info("Atf File All Rules Updated Successfully");
 
                 atfFileService.generateAtfFileReport(date);
@@ -166,4 +171,64 @@ public class AtfFileController {
         }
     }
 
+
+    @GetMapping("/process-atf-file/{date}")
+    public ResponseEntity<?> processAtfFile(@PathVariable("date") String date) throws Exception {
+        String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
+//        String atfFile = atfFileReportPath + "All_Txn_File-2023-12-11_2023-12-12.csv";
+        File atf = new File(atfFile);
+        boolean allTxnFileUpdated = false;
+        if (atf.exists()) {
+            try {
+                allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+                if (allTxnFileUpdated) {
+                    logger.info("ATF File Data inserted Successfully ----");
+                }
+                List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransIdReversalOnly();
+                atfFileService.generateAtfFileReportForReversalEntry(date);
+                Boolean remove = atfFileService.removeATFFileRecord();
+                if (remove) {
+                    logger.info("ATF File Data Removed Successfully ---");
+                }
+                mailHandler.sendMail(date);
+                logger.info("Mail send Successfully ---");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+//    @PostMapping("/upload-query-execution-file")
+//    public ResponseEntity<?> executeQueryFile(@RequestParam("file") MultipartFile file) throws IOException {
+//        String uploadDir = "/tmp/";
+//        File fh = new File("/tmp/");
+//        if (!fh.exists()) {
+//            fh.mkdir();
+//        }
+//        // Get the file and save it somewhere
+//        byte[] bytes = file.getBytes();
+//        final String filepath = uploadDir + file.getOriginalFilename();
+//        Path path = Paths.get(uploadDir + file.getOriginalFilename());
+//        Files.write(path, bytes);
+//
+//        String fileExtension = "";
+//        int index = file.getOriginalFilename().lastIndexOf(".");
+//        if (index > 0) {
+//            fileExtension = file.getOriginalFilename().substring(index + 1);
+//        }
+//        if (fileExtension.equals("txt")) {
+//            try {
+//                atfFileService.processQueryExecution(filepath);
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+//        }else{
+//            return new ResponseEntity<>(new ApiResponse(HttpStatus.BAD_REQUEST, "Please upload correct file format"), HttpStatus.BAD_REQUEST);
+//        }
+//    }
 }

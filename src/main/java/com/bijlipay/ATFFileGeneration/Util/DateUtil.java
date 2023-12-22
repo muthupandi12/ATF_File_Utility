@@ -45,10 +45,10 @@ public class DateUtil {
     }
 
 
-//    public static String parseSimpleDate(Date date) throws ParseException {
-//        SimpleDateFormat dateFormatter = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
-//        return dateFormatter.format(date);
-//    }
+    public static String parseSimpleDate(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
+        return dateFormatter.format(date);
+    }
 
     public static String parseSimpleDateForRules(Date date) throws ParseException {
         SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
