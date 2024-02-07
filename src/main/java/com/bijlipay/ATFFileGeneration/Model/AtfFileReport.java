@@ -121,6 +121,10 @@ public class AtfFileReport {
     @Column(name = "settled_txn_wrong_corresponding_void_or_reversal",columnDefinition = "tinyint(1) default 0")
     private boolean settledTxnWrongCorrespondingVoidOrReversal;
 
+    @Column(name = "host_failure_with_reversal",columnDefinition = "tinyint(1) default 0")
+    private boolean hostFailureWithReversal;
+
+
     public long getId() {
         return id;
     }
@@ -504,5 +508,13 @@ public class AtfFileReport {
 
     public void setSettledTxnWrongCorrespondingVoidOrReversal(boolean settledTxnWrongCorrespondingVoidOrReversal) {
         this.settledTxnWrongCorrespondingVoidOrReversal = settledTxnWrongCorrespondingVoidOrReversal;
+    }
+
+    public boolean isHostFailureWithReversal() {
+        return hostFailureWithReversal;
+    }
+
+    public void setHostFailureWithReversal(boolean hostFailureWithReversal) {
+        this.hostFailureWithReversal = hostFailureWithReversal;
     }
 }

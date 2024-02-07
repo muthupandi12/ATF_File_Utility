@@ -1,15 +1,25 @@
 package com.bijlipay.ATFFileGeneration.Service;
 
 import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
+import com.bijlipay.ATFFileGeneration.Model.Dto.AxisDto;
+import com.nimbusds.jose.JOSEException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
+import java.security.spec.InvalidKeySpecException;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -56,7 +66,35 @@ public interface AtfFileService {
 
     Boolean removeATFFileRecord();
 
-    void processQueryExecution(String filepath) throws FileNotFoundException, SQLException;
+    void processQueryExecution(String filepath) throws IOException, SQLException;
+
+    void executeQueryUpdation();
+
+    void processQueryExecution1(String filepath) throws IOException;
+
+    void atfFileRulesCount(String date) throws IOException;
+
+    void generateUpdatedATFFile(String date);
+
+    void generateSettlementReportForPhonePe(String settlementDate);
+
+    int removeSettlementRulesData() throws SQLException;
+
+    void generateFinalSettlementFile(String date) throws ParseException, SQLException;
+
+    void removeFile(String date);
+
+    int splitPhonePeSettlementData() throws SQLException;
+
+    void generateRefundFile(String date) throws ParseException;
+
+    String callAxisApiForGeotag(AxisDto axisDto) throws IOException, UnrecoverableKeyException, CertificateException, NoSuchAlgorithmException, InvalidKeySpecException, KeyStoreException, ParseException, JOSEException, KeyManagementException;
+
+    boolean downloadPhonePeFiles(String date);
+
+    void generateMissingRRNFromATF(String previousDate) throws ParseException, IOException;
+
+    void validatedAtfFileReport(String date) throws IOException;
 }
 
 

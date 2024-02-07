@@ -24,23 +24,20 @@ public class MailHandler {
 
     @Value("${atf.file.report.path}")
     private String atfFileReportPath;
-    public void sendMail(String date) {
+    public void sendATFRuleDataMail(String date) {
         try {
             MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
             helper.setFrom("reports@bijlipay.co.in");
             helper.setTo(Constants.SENT_TO);
-            helper.setSubject("ATF File Updated Report -" + date + "");
+            helper.setSubject("ATF Rules Executed Report -" + date + "");
             helper.setText(String.format("Dear All," + "\n\n" + "Greetings from Bijlipay!!" + "\n\n" + "" +
-                    " ATF File Updated Report - "+ date +" \n\n" + "Regards," + "\n" + "Team " +
+                    " ATF Rules Executed Report - "+ date +" \n\n" + "Regards," + "\n" + "Team " +
                     "Bijlipay\n\n Note :" +
                     "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
                     " write to us @ service@bijlipay.co.in."));
 
-            FileSystemResource file = new FileSystemResource(atfFileReportPath + "All_Txn_File-" + DateUtil.allTxnDate() + ".csv");
-//            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "All_Txn_File_Updated-" + DateUtil.allTxnDate() + ".txt");
-            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "All_Txn_File_Updated-" + date + ".txt");
-//            helper.addAttachment(file.getFilename(), file);
+            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "ATF_Rules_Executed_Report-" + date + ".txt");
             helper.addAttachment(file1.getFilename(), file1);
             sender.send(message);
         } catch (MessagingException e) {
@@ -48,6 +45,46 @@ public class MailHandler {
         }
     }
 
+    public void sendValidatedATFDataMail(String date) {
+        try {
+            MimeMessage message = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setFrom("reports@bijlipay.co.in");
+            helper.setTo(Constants.SENT_TO);
+            helper.setSubject("Validated ATF Report -" + date + "");
+            helper.setText(String.format("Dear All," + "\n\n" + "Greetings from Bijlipay!!" + "\n\n" + "" +
+                    " Validated ATF Report - "+ date +" \n\n" + "Regards," + "\n" + "Team " +
+                    "Bijlipay\n\n Note :" +
+                    "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
+                    " write to us @ service@bijlipay.co.in."));
+
+            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "Validated_ATF_Report-" + date + ".txt");
+            helper.addAttachment(file1.getFilename(), file1);
+            sender.send(message);
+        } catch (MessagingException e) {
+            e.printStackTrace();
+        }
+    }
+    public void sendReversalMail(String date) {
+        try {
+            MimeMessage message = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setFrom("reports@bijlipay.co.in");
+            helper.setTo(Constants.SENT_TO);
+            helper.setSubject("ATF ACK Reversal Report-" + date + "");
+            helper.setText(String.format("Dear All," + "\n\n" + "Greetings from Bijlipay!!" + "\n\n" + "" +
+                    " ATF ACK Reversal Report - "+ date +" \n\n" + "Regards," + "\n" + "Team " +
+                    "Bijlipay\n\n Note :" +
+                    "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
+                    " write to us @ service@bijlipay.co.in."));
+
+            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "ATF_ACK_Reversal_Report-" + date + ".txt");
+            helper.addAttachment(file1.getFilename(), file1);
+            sender.send(message);
+        } catch (MessagingException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void sendTotalFileMail() {
         try {
@@ -90,4 +127,31 @@ public class MailHandler {
     }
 
 
+    public void sendPhonePeSettlementReports(String date) {
+        try {
+            MimeMessage message = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setFrom("reports@bijlipay.co.in");
+            helper.setTo(Constants.SENT_TO_PHONEPE_REPORTS);
+            helper.setSubject("PhonePe Settlement Reports -" + date + "");
+            helper.setText(String.format("Dear All," + "\n\n" + "Greetings from Bijlipay!!" + "\n\n" + "" +
+                    " PhonePe Settlement Reports - - "+ date +" \n\n" + "Regards," + "\n" + "Team " +
+                    "Bijlipay\n\n Note :" +
+                    "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
+                    " write to us @ service@bijlipay.co.in."));
+
+            FileSystemResource atfMissingDataFile = new FileSystemResource(atfFileUpdatedPath + "PhonePe_Missing_Response_IN_Settlement_File_" + date + ".csv");
+            FileSystemResource settlementMissingDataFile = new FileSystemResource(atfFileUpdatedPath + "PhonePe_Missing_Response_IN_ATF_File_" + date + ".csv");
+            FileSystemResource settlementDataFile = new FileSystemResource(atfFileUpdatedPath + "PhonePe_Final_Settlement_File_" + date + ".csv");
+            FileSystemResource updatedAtfCountFile = new FileSystemResource(atfFileUpdatedPath + "ATF_Rules_Data_Count-" + date + ".txt");
+
+            helper.addAttachment(atfMissingDataFile.getFilename(), atfMissingDataFile);
+            helper.addAttachment(settlementMissingDataFile.getFilename(), settlementMissingDataFile);
+            helper.addAttachment(settlementDataFile.getFilename(), settlementDataFile);
+            helper.addAttachment(updatedAtfCountFile.getFilename(), updatedAtfCountFile);
+            sender.send(message);
+        } catch (MessagingException e) {
+            e.printStackTrace();
+        }
+    }
 }

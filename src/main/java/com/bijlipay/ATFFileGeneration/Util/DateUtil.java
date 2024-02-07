@@ -8,8 +8,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Random;
 
-import static com.bijlipay.ATFFileGeneration.Util.Constants.DateFormat;
-import static com.bijlipay.ATFFileGeneration.Util.Constants.DateFormat1;
+import static com.bijlipay.ATFFileGeneration.Util.Constants.*;
 
 public class DateUtil {
 
@@ -20,6 +19,12 @@ public class DateUtil {
     public static String allTxnDate() {
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.DATE, -1);
+        String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat);
+        return currentDate;
+    }
+
+    public static String currentDateATF() {
+        Calendar cal = Calendar.getInstance();
         String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat);
         return currentDate;
     }
@@ -84,7 +89,12 @@ public class DateUtil {
         return currentDate;
     }
 
-
+    public static String previousDateATF() {
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DATE, -1);
+        String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat);
+        return currentDate;
+    }
     public static String currentDate2() {
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.DATE, -1);
@@ -92,7 +102,18 @@ public class DateUtil {
         return currentDate;
     }
 
+    public static String twoDayBefore() {
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DATE, -2);
+        String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat1);
+        return currentDate;
+    }
 
+    public static String currentDateForAxis() {
+        Calendar cal = Calendar.getInstance();
+        String currentDate = DateUtil.calToDate(cal.getTime(), DateFormat_Axis);
+        return currentDate;
+    }
     public static String currentDate(String format) {
         SimpleDateFormat formatter = new SimpleDateFormat(format);
         Date date = new Date();
@@ -131,5 +152,12 @@ public class DateUtil {
         Date original = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(date);
         String newstr = new SimpleDateFormat("yyyy-MM-dd").format(original);
         return  newstr;
+    }
+
+    public static String epochTime(String date) throws ParseException {
+        SimpleDateFormat df = new SimpleDateFormat("MMM dd yyyy HH:mm:ss.SSS zzz");
+        Date date1 = df.parse(date);
+        long epoch = date1.getTime();
+        return String.valueOf(epoch);
     }
 }

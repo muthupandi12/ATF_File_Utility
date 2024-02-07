@@ -10,10 +10,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class ReportUtil {
     private static final Logger logger = LoggerFactory.getLogger(ReportUtil.class);
@@ -219,10 +217,8 @@ public class ReportUtil {
         logger.info("Creating CSV File -----{}", fileSheet);
         try {
             //creating csv file
-
             CSVWriter csvWriter = new CSVWriter(new FileWriter(file),',',CSVWriter.NO_QUOTE_CHARACTER);
             csvWriter.writeNext(txnFileHeader);
-//            log.info("Switch TXN CSV File Header Details ----{}", txnFileHeader);
             List<String[]> finalOut = new ArrayList<>();
             String[] out = null;
             for (Object[] obj : FileOut) {       //writing data to sheet
@@ -251,18 +247,53 @@ public class ReportUtil {
                 String Stan =String.valueOf(obj[22]);
                 String settlementMode =String.valueOf(obj[23]);
                 String settlementStatus =String.valueOf(obj[24]);
-
-
                 out = Arrays.asList(terminalId, merchantId, posDeviceId, batchNumber, cardHolderName, maskedCardNumber, transactionMode, invoiceNumber, acquirerBank, cardType, cardNetwork, cardIssuerCountryCode, amount, responseCode, rrn,transactionAuthCode,transactionDate,responseDate,transactionId,orgTransactionID,transactionType,status,Stan,settlementMode,settlementStatus).toArray(new String[0]);
                 finalOut.add(out);
-//                log.info("Final Out Data ----{}", finalOut);
             }
             csvWriter.writeAll(finalOut);
             csvWriter.close();
-            logger.info("AllAndSettlement Missing Data CSV File Generated Successfully----!!!");
+            logger.info("Updated File Generated Successfully----!!!");
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    public static void generateSettlementMissingDataCSVFile(List<Object[]> settlementMissingDataOut, String[] txnSettlementFileHeader, File settlementMissingDataFile, String settlementMissingDataFileSheet) {
+        logger.info("Creating CSV File -----{}", settlementMissingDataFileSheet);
+        try {
+            //creating csv file
+            CSVWriter csvWriter = new CSVWriter(new FileWriter(settlementMissingDataFile),',',CSVWriter.NO_QUOTE_CHARACTER);
+            csvWriter.writeNext(txnSettlementFileHeader);
+            List<String[]> finalOut = new ArrayList<>();
+            String[] out = null;
+            for (Object[] obj : settlementMissingDataOut) {       //writing data to sheet
+                String mid = String.valueOf(obj[0]);
+                String tid = String.valueOf(obj[1]);
+                String batchNumber = String.valueOf(obj[2]);
+                String invoiceNumber = String.valueOf(obj[3]);
+                String stan = String.valueOf(obj[4]);
+                String rrn = String.valueOf(obj[5]);
+                String authCode = String.valueOf(obj[6]);
+                String amount = String.valueOf(obj[7]);
+                String toChar = String.valueOf(obj[8]);
+                String additionalAmount = String.valueOf(obj[9]);
+                String status = String.valueOf(obj[10]);
+                out = Arrays.asList(mid, tid, batchNumber, invoiceNumber, stan, rrn, authCode, amount, toChar, additionalAmount, status).toArray(new String[0]);
+                finalOut.add(out);
+            }
+            csvWriter.writeAll(finalOut);
+            csvWriter.close();
+            logger.info("Missing PhonePe Settlement File Generated Successfully----!!!");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public static String convertWithStream(Map<String, ?> map) {
+        String mapAsString = map.keySet().stream()
+                .map(key -> key + "=" + map.get(key))
+                .collect(Collectors.joining(", ", "{", "}"));
+        return mapAsString;
+    }
 }

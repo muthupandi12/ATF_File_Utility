@@ -2,8 +2,10 @@ package com.bijlipay.ATFFileGeneration.Controller;
 
 import com.bijlipay.ATFFileGeneration.Config.ApiResponse;
 import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
+import com.bijlipay.ATFFileGeneration.Model.Dto.AxisDto;
 import com.bijlipay.ATFFileGeneration.Service.AtfFileService;
 import com.bijlipay.ATFFileGeneration.Util.DateUtil;
+import com.bijlipay.ATFFileGeneration.Util.JWEMainClient;
 import com.bijlipay.ATFFileGeneration.Util.MailHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,13 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,14 +37,10 @@ public class AtfFileController {
 
     @GetMapping("/upload-atf-file/{date}")
     public ResponseEntity<?> uploadAtfFile(@PathVariable("date") String date) throws Exception {
-        String allTxnDate = DateUtil.allTxnDate();
-        String currentDate = DateUtil.currentDate1();
         boolean allTxnFileUpdated = false;
         boolean txnListBefore = false;
         boolean txnListAfter = false;
         String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
-
-//        String atfFile = atfFileReportPath + "All_Txn_File_Staged_367.csv";
 
         String afterDate = DateUtil.addOneDay(date);
         String missingTxnBefore = atfFileReportPath + "TransactionList_" + date + ".csv";
@@ -77,7 +69,6 @@ public class AtfFileController {
                 if (txnListAfter) {
                     logger.info("Txn List File After Data inserted in db Successfully----{}", missingTxnAfter);
                 }
-
                 List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransId(date);
                 logger.info("Atf File All Rules Updated Successfully");
 
@@ -87,15 +78,9 @@ public class AtfFileController {
                 if (remove) {
                     logger.info("Remove Data in DB Successfully");
                 }
-                mailHandler.sendMail(date);
-                logger.info("Mail Send Successfully....");
+                mailHandler.sendATFRuleDataMail(date);
+                logger.info("ATF Rules Data Mail Send Successfully....");
 
-
-//            String destinationPath = "/home/uat1/ATFFiles/";
-//            boolean upload = atfFileService.uploadFilesToSFTP(updatedAtfFilePath,destinationPath);
-//            if(upload){
-//                logger.info("File Moved SuccessFully---");
-//            }
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -108,7 +93,6 @@ public class AtfFileController {
 
     @GetMapping(value = {"/getAftFileData", "/getAftFileData/{searchTerm}"})
     public ResponseEntity<?> getAtfData(@PathVariable("searchTerm") Optional<String> searchTerm) {
-//        pageable = webConfig.resolvePageable(requestParams, pageable);
         List<AtfFileReport> atfFileReport = atfFileService.getAtfFileData(searchTerm);
         return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success", atfFileReport), HttpStatus.OK);
     }
@@ -175,7 +159,6 @@ public class AtfFileController {
     @GetMapping("/process-atf-file/{date}")
     public ResponseEntity<?> processAtfFile(@PathVariable("date") String date) throws Exception {
         String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
-//        String atfFile = atfFileReportPath + "All_Txn_File-2023-12-11_2023-12-12.csv";
         File atf = new File(atfFile);
         boolean allTxnFileUpdated = false;
         if (atf.exists()) {
@@ -190,8 +173,9 @@ public class AtfFileController {
                 if (remove) {
                     logger.info("ATF File Data Removed Successfully ---");
                 }
-                mailHandler.sendMail(date);
-                logger.info("Mail send Successfully ---");
+                mailHandler.sendReversalMail(date);
+                logger.info("Reversal Data Mail send Successfully ---");
+                atfFileService.removeFile(date);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -202,33 +186,154 @@ public class AtfFileController {
         }
     }
 
-//    @PostMapping("/upload-query-execution-file")
-//    public ResponseEntity<?> executeQueryFile(@RequestParam("file") MultipartFile file) throws IOException {
-//        String uploadDir = "/tmp/";
-//        File fh = new File("/tmp/");
-//        if (!fh.exists()) {
-//            fh.mkdir();
-//        }
-//        // Get the file and save it somewhere
-//        byte[] bytes = file.getBytes();
-//        final String filepath = uploadDir + file.getOriginalFilename();
-//        Path path = Paths.get(uploadDir + file.getOriginalFilename());
-//        Files.write(path, bytes);
-//
-//        String fileExtension = "";
-//        int index = file.getOriginalFilename().lastIndexOf(".");
-//        if (index > 0) {
-//            fileExtension = file.getOriginalFilename().substring(index + 1);
-//        }
-//        if (fileExtension.equals("txt")) {
-//            try {
-//                atfFileService.processQueryExecution(filepath);
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
-//        }else{
-//            return new ResponseEntity<>(new ApiResponse(HttpStatus.BAD_REQUEST, "Please upload correct file format"), HttpStatus.BAD_REQUEST);
-//        }
+    @GetMapping("/get-atf-rules-count/{date}")
+    public ResponseEntity<?> getAtfRuleCount(@PathVariable("date") String date) throws Exception {
+//        atfFileService.executeQueryUpdation();
+        atfFileService.generateUpdatedATFFile(date);
+        atfFileService.atfFileRulesCount(date);
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
+
+    @GetMapping("/phonepe-settlement-refund-file/{date}")
+    public ResponseEntity<?> generateSettlementFile(@PathVariable("date") String date) throws Exception {
+        String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
+        String settlementDate = DateUtil.currentDate2();
+        String settlementFile = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_" + settlementDate + ".csv";
+        boolean allTxnFileUpdated = false;
+        boolean settlementFileUpdated = false;
+        try {
+            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+            settlementFileUpdated = atfFileService.updatesettlementFileData(settlementFile);
+            if (allTxnFileUpdated && settlementFileUpdated) {
+                logger.info("ATF and Settlement Response File Data Inserted successfully ---");
+            }
+            atfFileService.generateRefundFile(date);
+            atfFileService.removeSettlementRulesData();
+            int splitData = atfFileService.splitPhonePeSettlementData();
+            if (splitData > 0) {
+                atfFileService.generateFinalSettlementFile(date);
+                atfFileService.atfFileRulesCount(date);
+            }
+            mailHandler.sendPhonePeSettlementReports(date);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
+//    @GetMapping("/phonepe-refund-file/{date}")
+//    public ResponseEntity<?> generateRefundFile(@PathVariable("date") String date) throws Exception {
+//        atfFileService.generateRefundFile(date);
+//        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
 //    }
+
+    @GetMapping("/getPhonePeFiles")
+    public ResponseEntity<?> getATFResponseFiles() throws Exception {
+        boolean download = false;
+        String atfFile = atfFileReportPath + "All_Txn_File-" + DateUtil.previousDateATF() + ".csv";
+        String settlementDateBefore = DateUtil.currentDate2();
+        String settlementDateTwoDayBefore = DateUtil.twoDayBefore();
+        String settlementFileBefore = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_" + settlementDateBefore + ".csv";
+        String settlementFileTwoDayBefore = atfFileReportPath + "Response_BIGILIPAY_AXIS_H2H_SETTLEMENT_" + settlementDateTwoDayBefore + ".csv";
+
+        boolean allTxnFileUpdated = false;
+        boolean settlementFileUpdatedBefore = false;
+        boolean settlementFileUpdatedTwoDayBefore = false;
+        boolean txnListBefore = false;
+        boolean txnListAfter = false;
+        try {
+            String previousDate = DateUtil.previousDateATF();
+            String currentDate = DateUtil.currentDateATF();
+            String missingTxnBefore = atfFileReportPath + "TransactionList_" + previousDate + ".csv";
+            String missingTxnAfter = atfFileReportPath + "TransactionList_" + currentDate + ".csv";
+
+            logger.info("Files -- ATF --SettlementBefore --SettlementAfter--- Txn Before --- Txn After --{}--{}--{}--{} ---{}", atfFile, settlementFileUpdatedBefore, settlementFileUpdatedTwoDayBefore, missingTxnBefore, missingTxnAfter);
+
+//            download = atfFileService.downloadPhonePeFiles(currentDate);
+//            if (download) {
+            logger.info("File Download Successfully");
+//            Boolean beforeCheck = atfFileService.beforeCheck();
+//            if (beforeCheck) {
+//                logger.info("Checking data present in before insert ");
+//            }
+            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+            settlementFileUpdatedBefore = atfFileService.updatesettlementFileData(settlementFileBefore);
+            settlementFileUpdatedTwoDayBefore = atfFileService.updatesettlementFileData(settlementFileTwoDayBefore);
+//                txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
+//                txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
+//                if (txnListAfter && txnListBefore) {
+//                    logger.info("Transaction List File Data inserted successfully");
+//                }
+            if (allTxnFileUpdated && settlementFileUpdatedBefore && settlementFileUpdatedTwoDayBefore) {
+                logger.info("ATF and Settlement Response File Data Inserted successfully ---");
+            }
+//            }
+            atfFileService.generateMissingRRNFromATF(previousDate);
+            atfFileService.generateRefundFile(previousDate);
+            int remove = atfFileService.removeSettlementRulesData();
+            if (remove > 1) {
+                int splitData = atfFileService.splitPhonePeSettlementData();
+                if (splitData > 1) {
+                    logger.info("enter to generate files ---");
+                    atfFileService.generateFinalSettlementFile(previousDate);
+                    atfFileService.atfFileRulesCount(previousDate);
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
+
+    @PostMapping("/axisEncryptData")
+    public ResponseEntity<?> generateAxisData(@RequestBody AxisDto axisDto) throws Exception {
+        String encryptString = JWEMainClient.encryptData(axisDto);
+        logger.info("Encrypt String ---{}", encryptString);
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
+    @PostMapping("/axisDecryptData")
+    public ResponseEntity<?> decryptData(@RequestBody String encryptString) throws Exception {
+        String decryptString = JWEMainClient.decryptData(encryptString);
+        logger.info("Decrypt String ---{}", decryptString);
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
+    @PostMapping("/axisGeoTag")
+    public ResponseEntity<?> axisGeoTag(@RequestBody AxisDto axisDto) throws Exception {
+        String response = atfFileService.callAxisApiForGeotag(axisDto);
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success", response), HttpStatus.OK);
+
+    }
+
+
+    @GetMapping("/validate-atf-file/{date}")
+    public ResponseEntity<?> validateAtfFile(@PathVariable("date") String date) throws Exception {
+        boolean allTxnFileUpdated = false;
+        String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
+        logger.info("Files -- ATF --{}", atfFile);
+        try {
+            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+            if (allTxnFileUpdated) {
+                logger.info("All Txn File Data inserted in db Successfully----{}", atfFile);
+            }
+            List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransId(date);
+            logger.info("Atf File All Rules Updated Successfully");
+
+            atfFileService.validatedAtfFileReport(date);
+            Boolean remove = atfFileService.removeATFFileRecord();
+            if (remove) {
+                logger.info("Remove Data in DB Successfully");
+            }
+            mailHandler.sendValidatedATFDataMail(date);
+            logger.info("ATF Rules Data Mail Send Successfully....");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "success"), HttpStatus.OK);
+    }
+
 }
