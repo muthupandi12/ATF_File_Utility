@@ -95,13 +95,13 @@ public class JWEMainClient {
         String plainJSONRequest = "{\n" +
                 "    \"Data\": {\n" +
                 "        \"RRN\": \"1688382163040\",\n" +
-                "        \"MID\": \"037322025110024\",\n" +
+                "        \"MID\": \"037322025110025\",\n" +
                 "        \"LATITUDE\": \"13.0346034\",\n" +
                 "        \"LONGITUDE\": \"80.2381735\",\n" +
                 "        \"AGGRNAME\": \"BIJLIPAY\",\n" +
                 "        \"ACTION\": \"I\",\n" +
-                "        \"TID\": \"24578956\",\n" +
-                "        \"DATEOFCOMMISSIONING\": \"07022024\"\n" +
+                "        \"TID\": \"24578957\",\n" +
+                "        \"DATEOFCOMMISSIONING\": \"09022024\"\n" +
                 "    },\n" +
                 "    \"Risk\": {}\n" +
                 "}";

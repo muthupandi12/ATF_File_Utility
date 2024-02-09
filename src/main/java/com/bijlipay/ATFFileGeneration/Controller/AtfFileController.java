@@ -3,6 +3,10 @@ package com.bijlipay.ATFFileGeneration.Controller;
 import com.bijlipay.ATFFileGeneration.Config.ApiResponse;
 import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
 import com.bijlipay.ATFFileGeneration.Model.Dto.AxisDto;
+import com.bijlipay.ATFFileGeneration.Repository.NotificationDataRepository;
+import com.bijlipay.ATFFileGeneration.Repository.NotificationFieldsRepository;
+import com.bijlipay.ATFFileGeneration.Repository.SwitchRequestRepository;
+import com.bijlipay.ATFFileGeneration.Repository.SwitchResponseRepository;
 import com.bijlipay.ATFFileGeneration.Service.AtfFileService;
 import com.bijlipay.ATFFileGeneration.Util.DateUtil;
 import com.bijlipay.ATFFileGeneration.Util.JWEMainClient;
@@ -14,6 +18,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.io.File;
 import java.util.List;
 import java.util.Optional;
@@ -29,11 +35,25 @@ public class AtfFileController {
 
     @Value("${atf.file.updated.path}")
     private String updatedAtfFilePath;
+
     @Autowired
     private MailHandler mailHandler;
 
     @Autowired
     private AtfFileService atfFileService;
+
+    @Autowired
+    private NotificationDataRepository notificationDataRepository;
+
+    @Autowired
+    private NotificationFieldsRepository notificationFieldsRepository;
+
+    @Autowired
+    private SwitchRequestRepository switchRequestRepository;
+
+    @Autowired
+    private SwitchResponseRepository switchResponseRepository;
+
 
     @GetMapping("/upload-atf-file/{date}")
     public ResponseEntity<?> uploadAtfFile(@PathVariable("date") String date) throws Exception {
@@ -175,8 +195,7 @@ public class AtfFileController {
                 }
                 mailHandler.sendReversalMail(date);
                 logger.info("Reversal Data Mail send Successfully ---");
-                atfFileService.removeFile(date);
-
+//                atfFileService.removeFile(date);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -257,19 +276,19 @@ public class AtfFileController {
 //            if (beforeCheck) {
 //                logger.info("Checking data present in before insert ");
 //            }
-            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
-            settlementFileUpdatedBefore = atfFileService.updatesettlementFileData(settlementFileBefore);
-            settlementFileUpdatedTwoDayBefore = atfFileService.updatesettlementFileData(settlementFileTwoDayBefore);
-//                txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
-//                txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
-//                if (txnListAfter && txnListBefore) {
-//                    logger.info("Transaction List File Data inserted successfully");
-//                }
-            if (allTxnFileUpdated && settlementFileUpdatedBefore && settlementFileUpdatedTwoDayBefore) {
-                logger.info("ATF and Settlement Response File Data Inserted successfully ---");
-            }
+//            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+//            settlementFileUpdatedBefore = atfFileService.updatesettlementFileData(settlementFileBefore);
+//            settlementFileUpdatedTwoDayBefore = atfFileService.updatesettlementFileData(settlementFileTwoDayBefore);
+//            txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
+//            txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
+//            if (txnListAfter && txnListBefore) {
+//                logger.info("Transaction List File Data inserted successfully");
 //            }
-            atfFileService.generateMissingRRNFromATF(previousDate);
+//            if (allTxnFileUpdated && settlementFileUpdatedBefore && settlementFileUpdatedTwoDayBefore) {
+//                logger.info("ATF and Settlement Response File Data Inserted successfully ---");
+//            }
+//            }
+//            atfFileService.generateMissingRRNFromATF(previousDate);
             atfFileService.generateRefundFile(previousDate);
             int remove = atfFileService.removeSettlementRulesData();
             if (remove > 1) {
@@ -314,6 +333,9 @@ public class AtfFileController {
     public ResponseEntity<?> validateAtfFile(@PathVariable("date") String date) throws Exception {
         boolean allTxnFileUpdated = false;
         String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
+
+//        String atfFile = atfFileReportPath + "ATF_Testing.csv";
+
         logger.info("Files -- ATF --{}", atfFile);
         try {
             allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
@@ -336,4 +358,56 @@ public class AtfFileController {
         return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "success"), HttpStatus.OK);
     }
 
+
+    @GetMapping("upload-notification-and-switch-data")
+    public ResponseEntity<?> uploadNotifications() {
+
+        String fileDate = DateUtil.allTxnDate();
+        boolean notificationDataUpdated = false;
+        boolean switchReqResUpdated = false;
+        String notificationFile = atfFileReportPath + "Notification_File_" + fileDate + ".xlsx";
+        String switchFile = atfFileReportPath + "SwitchReqRes_File_" + fileDate + ".xlsx";
+
+        try {
+            notificationDataRepository.truncate();
+            logger.info("Notification Data Table Truncated ");
+
+            notificationFieldsRepository.truncate();
+            logger.info("Notification Fields Table Truncated ");
+
+            switchRequestRepository.truncate();
+            logger.info("Switch Request Table Truncated ");
+
+            switchResponseRepository.truncate();
+            logger.info("Switch Response Table Truncated ");
+
+
+            notificationDataUpdated = atfFileService.updateNotificationDataIntoDb(notificationFile);
+            if (notificationDataUpdated) {
+                logger.info("Notification Data and fields inserted in db Successfully----{}", notificationFile);
+            }
+
+            switchReqResUpdated = atfFileService.updatedSwitchReqResDataIntoDb(switchFile);
+            if (switchReqResUpdated) {
+                logger.info("Switch Request Response inserted in db Successfully----{}", switchFile);
+            }
+
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Failed", e.getMessage()), HttpStatus.OK);
+        }
+    }
+
+
+    @GetMapping("/generate-atf-for-transactions")
+    public ResponseEntity<?> uploadAtfFile(@RequestParam("file") MultipartFile file) {
+
+        try {
+            String atfFileGenerated = updatedAtfFilePath + "All_Txn_File.csv";
+            boolean result = atfFileService.generateATFfile(file, atfFileGenerated);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success", result), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success", e.getMessage()), HttpStatus.OK);
+        }
+    }
 }

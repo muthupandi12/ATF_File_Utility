@@ -160,4 +160,15 @@ public class DateUtil {
         long epoch = date1.getTime();
         return String.valueOf(epoch);
     }
+
+
+    public static String getFormatedDate(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        return dateFormatter.format(date.getTime());
+    }
+
+    public static String parseDateFromDateTime(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+        return dateFormatter.format(date);
+    }
 }

@@ -50,7 +50,7 @@ public class MailHandler {
             MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
             helper.setFrom("reports@bijlipay.co.in");
-            helper.setTo(Constants.SENT_TO);
+            helper.setTo(Constants.SENT_VALIDATED_ATF);
             helper.setSubject("Validated ATF Report -" + date + "");
             helper.setText(String.format("Dear All," + "\n\n" + "Greetings from Bijlipay!!" + "\n\n" + "" +
                     " Validated ATF Report - "+ date +" \n\n" + "Regards," + "\n" + "Team " +

@@ -70,8 +70,11 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport, Long> {
     @Query(value = "select t.transaction_id from atf_file_report_main t where t.host_failure_with_reversal =1 and t.transaction_type in ('Sale','UPI') ", nativeQuery = true)
     List<Object[]> findByAtfFileDataRule18();
 
+    @Query(value = "select t.transaction_id from atf_file_report_main t where t.zero_transaction_amount =1 and t.transaction_type in ('Sale','UPI') ", nativeQuery = true)
+    List<Object[]> findByAtfFileDataRule19();
 
-
+    @Query(value = "select distinct(t.transaction_id) from atf_file_report_main t where t.sale_upi_multiple_record =1 and t.transaction_type in ('Sale','UPI') ", nativeQuery = true)
+    List<Object[]> findByAtfFileDataRule20();
 
 
     @Query(value = "select a from AtfFileReport a where a.transactionId =?1")

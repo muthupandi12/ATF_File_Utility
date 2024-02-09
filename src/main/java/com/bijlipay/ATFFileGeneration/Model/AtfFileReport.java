@@ -124,6 +124,11 @@ public class AtfFileReport {
     @Column(name = "host_failure_with_reversal",columnDefinition = "tinyint(1) default 0")
     private boolean hostFailureWithReversal;
 
+    @Column(name = "zero_transaction_amount",columnDefinition = "tinyint(1) default 0")
+    private boolean zeroTransactionAmount;
+
+    @Column(name = "sale_upi_multiple_record",columnDefinition = "tinyint(1) default 0")
+    private boolean saleUpiMultipleRecord;
 
     public long getId() {
         return id;
@@ -516,5 +521,21 @@ public class AtfFileReport {
 
     public void setHostFailureWithReversal(boolean hostFailureWithReversal) {
         this.hostFailureWithReversal = hostFailureWithReversal;
+    }
+
+    public boolean isZeroTransactionAmount() {
+        return zeroTransactionAmount;
+    }
+
+    public void setZeroTransactionAmount(boolean zeroTransactionAmount) {
+        this.zeroTransactionAmount = zeroTransactionAmount;
+    }
+
+    public boolean isSaleUpiMultipleRecord() {
+        return saleUpiMultipleRecord;
+    }
+
+    public void setSaleUpiMultipleRecord(boolean saleUpiMultipleRecord) {
+        this.saleUpiMultipleRecord = saleUpiMultipleRecord;
     }
 }

@@ -6,6 +6,7 @@ import com.bijlipay.ATFFileGeneration.Model.Dto.DateDto;
 import com.bijlipay.ATFFileGeneration.Repository.*;
 import com.bijlipay.ATFFileGeneration.Service.AtfFileService;
 import com.bijlipay.ATFFileGeneration.Util.*;
+import com.bijlipay.ATFFileGeneration.Util.DateUtil;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
@@ -13,7 +14,10 @@ import com.jcraft.jsch.SftpException;
 import com.nimbusds.jose.JOSEException;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
+import com.opencsv.CSVWriter;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.net.ssl.*;
 import java.io.*;
@@ -29,6 +34,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.channels.Channel;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.CertificateException;
@@ -38,6 +44,7 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.Date;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -65,6 +72,18 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Autowired
     private TransactionListRepository transactionListRepository;
+
+    @Autowired
+    private NotificationDataRepository notificationDataRepository;
+
+    @Autowired
+    private NotificationFieldsRepository notificationFieldsRepository;
+
+    @Autowired
+    private SwitchRequestRepository switchRequestRepository;
+
+    @Autowired
+    private SwitchResponseRepository switchResponseRepository;
 
     @Autowired
     private TxnListMainTotalRepository txnListMainTotalRepository;
@@ -184,7 +203,7 @@ public class AtfFileServiceImpl implements AtfFileService {
         String updatedAtfFile = updatedAtfFilePath + "/ATF_Rules_Executed_Report-" + date + ".txt";
         String atfFileSheet = "ATF_Rules_Executed_Report-" + date + ".txt";
         List<Object[]> atf = null;
-        for (int i = 0; i < 18; i++) {
+        for (int i = 0; i < 20; i++) {
             String[] addressesArr = new String[1];
             if (i == 0) {
                 addressesArr[0] = "Rule 1- SALE & UPI & VOID & Reversal ResponseDate lesser than transactionDate";
@@ -204,7 +223,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                 addressesArr[0] = "Rule 5- VOID txns OriginalTransactionID should not match with a SALE Txn ID in same file with different date";
                 atf = atfFileRepository.findByAtfFileDataRule5();
             } else if (i == 5) {
-                addressesArr[0] = "Rule 6- SALE Reversal txns OriginalTransactionID  & Txn ID should not match with a SALE Txn ID in same file with different date";
+                addressesArr[0] = "Rule 6- SALE Reversal txns OriginalTransactionID  & Txn ID should not match with a SALE Txn ID and same file with different date";
                 atf = atfFileRepository.findByAtfFileDataRule6();
 
             } else if (i == 6) {
@@ -239,11 +258,17 @@ public class AtfFileServiceImpl implements AtfFileService {
                 addressesArr[0] = "Rule 16- SALE and UPI transactions with ACK or HOST with responsecode 00 but marked as not settled with corresponding VOID or Reversal in transactionDate before 23:00:00";
                 atf = atfFileRepository.findByAtfFileDataRule16();
             } else if (i == 16) {
-                addressesArr[0] = "Rule 17- Rules Not Verified because Data alignment issues Data";
+                addressesArr[0] = "Rule 17- Rules Not Verified because Multiple data for the same transactionId and Data alignment issues";
                 atf = atfFileRepository.findByAtfFileDataRule17();
             } else if (i == 17) {
                 addressesArr[0] = "Rule 18- Host Failure Response with Reversal";
                 atf = atfFileRepository.findByAtfFileDataRule18();
+            } else if (i == 18) {
+                addressesArr[0] = "Rule 19- Zero Transaction Amount";
+                atf = atfFileRepository.findByAtfFileDataRule19();
+            } else if (i == 19) {
+                addressesArr[0] = "Rule 20- Sale and UPI Multiple Records like HOST OR ACK OR INIT";
+                atf = atfFileRepository.findByAtfFileDataRule20();
             }
 //            ReportUtil.generateAtfFileDataDummy(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
             ReportUtil.generateAtfFileReportInTextFile(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
@@ -303,6 +328,18 @@ public class AtfFileServiceImpl implements AtfFileService {
                 logger.info("Double Transaction Id List --{}", update.size());
                 update.get(0).setRulesVerifiedStatus(true);
                 update.get(1).setRulesVerifiedStatus(true);
+                if (update.get(0).getTransactionType().equals("Sale") && update.get(1).getTransactionType().equals("Sale")) {
+                    update.get(0).setSaleUpiMultipleRecord(true);
+                    update.get(1).setSaleUpiMultipleRecord(true);
+                }
+                if (update.get(0).getTransactionType().equals("UPI") && update.get(1).getTransactionType().equals("UPI")) {
+                    update.get(0).setSaleUpiMultipleRecord(true);
+                    update.get(1).setSaleUpiMultipleRecord(true);
+                }
+                if (update.get(0).getAmount().equals("000000000000") || update.get(1).getAmount().equals("000000000000")) {
+                    update.get(0).setZeroTransactionAmount(true);
+                    update.get(1).setZeroTransactionAmount(true);
+                }
                 if ((update.get(0).getTransactionType().equals("Void") || update.get(0).getTransactionType().equals("Reversal")) || (update.get(1).getTransactionType().equals("Void") || update.get(1).getTransactionType().equals("Reversal"))) {
                     if (update.get(0).getTransactionType().equals("Void") || update.get(1).getTransactionType().equals("Void")) {
                         if (update.get(0).getTransactionType().equals("Void")) {
@@ -511,7 +548,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     update.get(0).setVoidReversalNullValueStatus(true);
                                     update.get(1).setVoidReversalNullValueStatus(true);
                                 }
-                                if((update.get(1).getStatus().equals("HOST")) && (!update.get(1).getResponseCode().equals("00"))){
+                                if ((update.get(1).getStatus().equals("HOST")) && (!update.get(1).getResponseCode().equals("00"))) {
                                     update.get(0).setHostFailureWithReversal(true);
                                     update.get(1).setHostFailureWithReversal(true);
                                 }
@@ -523,7 +560,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     update.get(0).setVoidReversalNullValueStatus(true);
                                     update.get(1).setVoidReversalNullValueStatus(true);
                                 }
-                                if((update.get(1).getStatus().equals("HOST")) && (!update.get(1).getResponseCode().equals("00"))){
+                                if ((update.get(1).getStatus().equals("HOST")) && (!update.get(1).getResponseCode().equals("00"))) {
                                     update.get(0).setHostFailureWithReversal(true);
                                     update.get(1).setHostFailureWithReversal(true);
                                 }
@@ -540,7 +577,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                         update.get(0).setVoidReversalNullValueStatus(true);
                                         update.get(1).setVoidReversalNullValueStatus(true);
                                     }
-                                    if((update.get(0).getStatus().equals("HOST")) && (!update.get(0).getResponseCode().equals("00"))){
+                                    if ((update.get(0).getStatus().equals("HOST")) && (!update.get(0).getResponseCode().equals("00"))) {
                                         update.get(0).setHostFailureWithReversal(true);
                                         update.get(1).setHostFailureWithReversal(true);
                                     }
@@ -552,7 +589,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                         update.get(0).setVoidReversalNullValueStatus(true);
                                         update.get(1).setVoidReversalNullValueStatus(true);
                                     }
-                                    if((update.get(0).getStatus().equals("HOST")) && (!update.get(0).getResponseCode().equals("00"))){
+                                    if ((update.get(0).getStatus().equals("HOST")) && (!update.get(0).getResponseCode().equals("00"))) {
                                         update.get(0).setHostFailureWithReversal(true);
                                         update.get(1).setHostFailureWithReversal(true);
                                     }
@@ -717,6 +754,8 @@ public class AtfFileServiceImpl implements AtfFileService {
                             }
                         }
                     }
+
+
                     doubleEntry.addAll(update);
                 }
 
@@ -820,12 +859,16 @@ public class AtfFileServiceImpl implements AtfFileService {
                         fileReport.setSaleTxnOnlyInitStatus(true);
                     }
                 }
+                if (fileReport.getAmount().equals("000000000000")) {
+                    fileReport.setZeroTransactionAmount(true);
+                }
                 singleEntry.add(fileReport);
             }
         });
 
         atfFileRepository.saveAll(singleEntry);
         atfFileRepository.saveAll(doubleEntry);
+
         logger.info("Rules Updated Successfully---");
     }
 
@@ -1070,7 +1113,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 //        String date1 = "2023-10-13".concat(" 23:00:00");
 //        String date2 = "2023-10-14".concat(" 23:00:00");
 
-        addressesArr[0] = "Rule 19 - ATF File Missing Transactions - RRN List";
+        addressesArr[0] = "Rule 21 - ATF File Missing Transactions - RRN List";
         List<Object[]> missingData = txnListMainTotalRepository.findByATFFileMissingData(date1, date2);
         logger.info("Missing Txn List Size --{}", missingData.size());
         ReportUtil.generateAtfFileReportInTextFile(missingData, Constants.MISSING_TXN_HEADER, updatedAtfFile, atfFileSheet, addressesArr);
@@ -1142,7 +1185,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                 this.mSSHSession.disconnect();
                 status = true;
             } catch (Exception e) {
-                System.out.print(e);
+                e.printStackTrace();
             }
         }
         return status;
@@ -1486,45 +1529,45 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Override
     public int removeSettlementRulesData() throws SQLException {
-            Connection con = null;
-            Statement stmt = null;
-            int voidReversalQuery = 0;
-            int saleInitQuery = 0;
-            int upiInitQuery = 0;
-            int saleHostQuery = 0;
-            int upiHostQuery = 0;
-            try {
-                con = getAtfConnection();
-                stmt = con.createStatement();
-                List<String> voidOrReversal = atfFileRepository.findAllTransIdForVoidOrReversal();
-                String list = voidOrReversal.stream().collect(Collectors.joining("','", "'", "'"));
-                String voidReversal = "delete from atf_file_report_main  where transaction_id in (" + list + ") OR org_transaction_id in(" + list + ")";
-                String saleInit = "delete from atf_file_report_main  where transaction_type ='Sale' and status ='INIT'";
-                String upiInit = "delete from atf_file_report_main  where transaction_type ='UPI' and status ='INIT'";
-                String saleHost = "delete from atf_file_report_main where transaction_type ='Sale' and status ='HOST' and response_code not in ('00')";
-                String upiHost = "delete from atf_file_report_main where transaction_type ='UPI' and status ='HOST' and response_code not in ('00')";
-                voidReversalQuery = stmt.executeUpdate(voidReversal);
-                saleInitQuery = stmt.executeUpdate(saleInit);
-                upiInitQuery = stmt.executeUpdate(upiInit);
-                saleHostQuery = stmt.executeUpdate(saleHost);
-                upiHostQuery = stmt.executeUpdate(upiHost);
-                logger.info("All Query Out -----{} --- {} --{} --{} --{}", voidReversalQuery, saleInitQuery, upiInitQuery, saleHostQuery, upiHostQuery);
-                stmt.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                if (con != null) {
-                    con.close();
-                }
+        Connection con = null;
+        Statement stmt = null;
+        int voidReversalQuery = 0;
+        int saleInitQuery = 0;
+        int upiInitQuery = 0;
+        int saleHostQuery = 0;
+        int upiHostQuery = 0;
+        try {
+            con = getAtfConnection();
+            stmt = con.createStatement();
+            List<String> voidOrReversal = atfFileRepository.findAllTransIdForVoidOrReversal();
+            String list = voidOrReversal.stream().collect(Collectors.joining("','", "'", "'"));
+            String voidReversal = "delete from atf_file_report_main  where transaction_id in (" + list + ") OR org_transaction_id in(" + list + ")";
+            String saleInit = "delete from atf_file_report_main  where transaction_type ='Sale' and status ='INIT'";
+            String upiInit = "delete from atf_file_report_main  where transaction_type ='UPI' and status ='INIT'";
+            String saleHost = "delete from atf_file_report_main where transaction_type ='Sale' and status ='HOST' and response_code not in ('00')";
+            String upiHost = "delete from atf_file_report_main where transaction_type ='UPI' and status ='HOST' and response_code not in ('00')";
+            voidReversalQuery = stmt.executeUpdate(voidReversal);
+            saleInitQuery = stmt.executeUpdate(saleInit);
+            upiInitQuery = stmt.executeUpdate(upiInit);
+            saleHostQuery = stmt.executeUpdate(saleHost);
+            upiHostQuery = stmt.executeUpdate(upiHost);
+            logger.info("All Query Out -----{} --- {} --{} --{} --{}", voidReversalQuery, saleInitQuery, upiInitQuery, saleHostQuery, upiHostQuery);
+            stmt.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (con != null) {
+                con.close();
             }
+        }
 //            List<String> voidOrReversal = atfFileRepository.findAllTransIdForVoidOrReversal();
 //            atfFileRepository.removeVoidOrReversalEntry(voidOrReversal);
 //            atfFileRepository.removeSaleWithInitStatus();
 //            atfFileRepository.removeUPIWithInitStatus();
 //            atfFileRepository.removeSaleAndHostNotInResponseCodeSuccess();
 //            atfFileRepository.removeUPIAndHostNotInResponseCodeSuccess();
-            logger.info("Data Removed Successfully For Settlement Rules Process");
-            return upiHostQuery;
+        logger.info("Data Removed Successfully For Settlement Rules Process");
+        return upiHostQuery;
     }
 
     @Override
@@ -1709,8 +1752,8 @@ public class AtfFileServiceImpl implements AtfFileService {
         boolean status = false;
         String currentDate = DateUtil.currentDateATF();
         String previousDate = DateUtil.previousDateATF();
-        String sourcePath = "/home/uat1/uploads/"+currentDate+"";
-        String sourcePath1 = "/home/uat1/uploads/"+previousDate+"";
+        String sourcePath = "/home/uat1/uploads/" + currentDate + "";
+        String sourcePath1 = "/home/uat1/uploads/" + previousDate + "";
         String destinationPath = "C:\\Users\\muthupandi\\Music";
 
         try {
@@ -1811,7 +1854,7 @@ public class AtfFileServiceImpl implements AtfFileService {
         String updatedAtfFile = updatedAtfFilePath + "/Validated_ATF_Report-" + date + ".txt";
         String atfFileSheet = "Validated_ATF_Report-" + date + ".txt";
         List<Object[]> atf = null;
-        for (int i = 0; i < 18; i++) {
+        for (int i = 0; i < 20; i++) {
             String[] addressesArr = new String[1];
             if (i == 0) {
                 addressesArr[0] = "Rule 1- SALE & UPI & VOID & Reversal ResponseDate lesser than transactionDate";
@@ -1867,6 +1910,12 @@ public class AtfFileServiceImpl implements AtfFileService {
             } else if (i == 17) {
                 addressesArr[0] = "Rule 18- Host Failure Response with Reversal";
                 atf = atfFileRepository.findByAtfFileDataRule18();
+            } else if (i == 18) {
+                addressesArr[0] = "Rule 19- Zero Transaction Amount";
+                atf = atfFileRepository.findByAtfFileDataRule19();
+            } else if (i == 19) {
+                addressesArr[0] = "Rule 20- Sale and UPI Multiple Records like HOST OR ACK OR INIT";
+                atf = atfFileRepository.findByAtfFileDataRule20();
             }
             ReportUtil.generateAtfFileReportInTextFile(atf, Constants.ATF_FILE_HEADER1, updatedAtfFile, atfFileSheet, addressesArr);
         }
@@ -1888,7 +1937,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                     new File(destinationPath + PATHSEPARATOR + item.getFilename());
                     this.mChannelSftp.get(sourcePath + PATHSEPARATOR + item.getFilename(),
                             destinationPath + PATHSEPARATOR + item.getFilename()); // Download file from source (source filename, destination filename).
-                    logger.info("====file name in mchannelSftp====" + item.getFilename());
+                    logger.info("file name in SFTP ----" + item.getFilename());
 
                 }
             } else if (!(".".equals(item.getFilename()) || "..".equals(item.getFilename()))) {
@@ -1912,4 +1961,1125 @@ public class AtfFileServiceImpl implements AtfFileService {
     public Connection getAtfConnection() throws SQLException {
         return DriverManager.getConnection(atfUrl, atfUserName, atfPassword);
     }
+
+
+    @Override
+    public boolean updateNotificationDataIntoDb(String notificationFile) throws IOException, ParseException {
+        boolean updatedNotificationData = false;
+        boolean updatedNotificationFields = false;
+
+        List<NotificationData> notificationDataList = new ArrayList<>();
+        List<NotificationFields> notificationFieldsList = new ArrayList<>();
+        String fileExtension = "";
+        int index = notificationFile.lastIndexOf(".");
+        if (index > 0) {
+            fileExtension = notificationFile.substring(index + 1);
+            if (fileExtension.equals("xlsx")) {
+                Workbook workbook = null;
+                try {
+                    FileInputStream excelFile = new FileInputStream(notificationFile);
+
+
+                    workbook = new XSSFWorkbook(excelFile);
+
+                    //Insertion of Notification Data
+
+                    Sheet notificationDataSheet = workbook.getSheetAt(0);
+                    Iterator<Row> rowIteratorForNotificationData = notificationDataSheet.rowIterator();
+
+                    while (rowIteratorForNotificationData.hasNext()) {
+                        Row row = rowIteratorForNotificationData.next();
+                        // skip first row, as it contains column names
+                        if (row.getRowNum() == 0) {
+                            continue;
+                        }
+
+                        NotificationData notificationData = new NotificationData();
+                        notificationData.setId((row.getCell(0) != null && !row.getCell(0).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? Long.parseLong(row.getCell(0).getStringCellValue().replaceAll("\u00a0", "").trim()) : null);
+                        notificationData.setTxnCorrelationId((row.getCell(1) != null && !row.getCell(1).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(1).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setTransactionId((row.getCell(2) != null && !row.getCell(2).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(2).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setOrgTransactionId((row.getCell(3) != null && !row.getCell(3).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(3).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setNotificationType((row.getCell(4) != null && !row.getCell(4).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(4).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setTerminalId((row.getCell(5) != null && !row.getCell(5).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(5).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setMTI((row.getCell(6) != null && !row.getCell(6).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(6).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setTransactionType((row.getCell(7) != null && !row.getCell(7).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(7).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setProcessingCode((row.getCell(8) != null && !row.getCell(8).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(8).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setDescription((row.getCell(9) != null && !row.getCell(9).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(9).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setNotificationStatus((row.getCell(10) != null && !row.getCell(10).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(10).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setDateTime((row.getCell(11) != null && !row.getCell(11).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? DateUtil.stringToDate(row.getCell(11).getStringCellValue().replaceAll("\u00a0", "").trim()) : null);
+                        notificationData.setRrn((row.getCell(12) != null && !row.getCell(12).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(12).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setMerchantId((row.getCell(13) != null && !row.getCell(13).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(13).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setTransactionDateTime((row.getCell(14) != null && !row.getCell(14).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(14).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setNotificationFieldsId((row.getCell(15) != null && !row.getCell(15).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? Long.parseLong(row.getCell(15).getStringCellValue().replaceAll("\u00a0", "").trim()) : null);
+                        notificationData.setTransactionAuthCode((row.getCell(16) != null && !row.getCell(16).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(16).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setResponseDateTime((row.getCell(17) != null && !row.getCell(17).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(17).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setHostResponseDateTime((row.getCell(18) != null && !row.getCell(18).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(18).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setResponseCode((row.getCell(19) != null && !row.getCell(19).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(19).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setStan((row.getCell(20) != null && !row.getCell(20).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(20).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setSettlementStatus((row.getCell(21) != null && !row.getCell(21).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(21).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setInvoiceNumber((row.getCell(22) != null && !row.getCell(22).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(22).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setBatchNumber((row.getCell(23) != null && !row.getCell(23).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(23).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationData.setNotificationRecipient((row.getCell(24) != null && !row.getCell(24).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(24).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationDataList.add(notificationData);
+                        logger.info("Notification Data - Transaction Id - {}", notificationData.getTransactionId());
+
+                    }
+
+                    notificationDataRepository.saveAll(notificationDataList);
+                    updatedNotificationData = true;
+
+                    logger.info("Notification Data File Inserted Successfully----!!!");
+
+                    //Insertion of Notification Fields
+
+                    Sheet notificationFieldsSheet = workbook.getSheetAt(1);
+                    Iterator<Row> rowIteratorForNotificationFields = notificationFieldsSheet.rowIterator();
+
+                    while (rowIteratorForNotificationFields.hasNext()) {
+                        Row row = rowIteratorForNotificationFields.next();
+                        // skip first row, as it contains column names
+                        if (row.getRowNum() == 0) {
+                            continue;
+                        }
+
+                        NotificationFields notificationFields = new NotificationFields();
+                        notificationFields.setId((row.getCell(0) != null && !row.getCell(0).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? Long.parseLong(row.getCell(0).getStringCellValue().replaceAll("\u00a0", "").trim()) : null);
+                        notificationFields.setRrn((row.getCell(1) != null && !row.getCell(1).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(1).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setBatchNumber((row.getCell(2) != null && !row.getCell(2).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(2).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setCardHolderName((row.getCell(3) != null && !row.getCell(3).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(3).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setMerchantId((row.getCell(4) != null && !row.getCell(4).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(4).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setAmount((row.getCell(5) != null && !row.getCell(5).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(5).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setMaskedCardNumber((row.getCell(6) != null && !row.getCell(6).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(6).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setPosDeviceId((row.getCell(7) != null && !row.getCell(7).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(7).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setTransactionMode((row.getCell(8) != null && !row.getCell(8).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(8).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setTransactionType((row.getCell(9) != null && !row.getCell(9).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(9).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setCardNetwork((row.getCell(10) != null && !row.getCell(10).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(10).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setInvoiceNumber((row.getCell(11) != null && !row.getCell(11).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(11).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setAcquirerBank((row.getCell(12) != null && !row.getCell(12).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(12).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setCardIssuerCountryCode((row.getCell(13) != null && !row.getCell(13).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(13).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setCardType((row.getCell(14) != null && !row.getCell(14).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(14).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setTransactionDateTime((row.getCell(15) != null && !row.getCell(15).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(15).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setSettlementMode((row.getCell(16) != null && !row.getCell(16).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(16).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFields.setTerminalId((row.getCell(17) != null && !row.getCell(17).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(17).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        notificationFieldsList.add(notificationFields);
+                        logger.info("Notification Field - RRN -  {}", notificationFields.getRrn());
+
+                    }
+
+                    notificationFieldsRepository.saveAll(notificationFieldsList);
+                    updatedNotificationFields = true;
+
+                    workbook.close();
+                    excelFile.close();
+
+                    logger.info("Notification Fields Inserted Successfully----!!!");
+                } catch (FileNotFoundException fe) {
+                    logger.info("Notification File not available for " + DateUtil.allTxnDate());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw e;
+                }
+            } else {
+                logger.info("Invalid File format");
+            }
+        }
+
+        return updatedNotificationData && updatedNotificationFields;
+    }
+
+    @Override
+    public boolean updatedSwitchReqResDataIntoDb(String switchReqResFile) {
+        boolean updatedSwitchRequest = false;
+        boolean updatedSwitchResponse = false;
+
+        List<SwitchRequest> switchRequestList = new ArrayList<>();
+        List<SwitchResponse> switchResponseList = new ArrayList<>();
+        String fileExtension = "";
+        int index = switchReqResFile.lastIndexOf(".");
+        if (index > 0) {
+            fileExtension = switchReqResFile.substring(index + 1);
+            if (fileExtension.equals("xlsx")) {
+                try {
+                    FileInputStream excelFile = new FileInputStream(switchReqResFile);
+
+                    Workbook workbook = new XSSFWorkbook(excelFile);
+
+                    //Insertion of Switch Request
+
+                    Sheet switchRequestSheet = workbook.getSheetAt(0);
+                    Iterator<Row> rowIteratorForSwitchRequest = switchRequestSheet.rowIterator();
+
+                    while (rowIteratorForSwitchRequest.hasNext()) {
+                        Row row = rowIteratorForSwitchRequest.next();
+                        // skip first row, as it contains column names
+                        if (row.getRowNum() == 0) {
+                            continue;
+                        }
+
+                        SwitchRequest switchRequest = new SwitchRequest();
+                        switchRequest.setTxnCorrelationId((row.getCell(0) != null) && !row.getCell(0).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(0).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setCardholderPan((row.getCell(1) != null) && !row.getCell(1).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(1).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantPan((row.getCell(2) != null) && !row.getCell(2).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(2).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setBeneficiaryPan((row.getCell(3) != null) && !row.getCell(3).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(3).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setCardholderAccNo((row.getCell(4) != null) && !row.getCell(4).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(4).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setBeneficiaryAccNo((row.getCell(5) != null) && !row.getCell(5).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(5).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMTI((row.getCell(6) != null) && !row.getCell(6).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(6).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnType((row.getCell(7) != null) && !row.getCell(7).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(7).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setCardholderAccType((row.getCell(8) != null) && !row.getCell(8).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(8).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setBeneficiaryAccType((row.getCell(9) != null) && !row.getCell(9).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(9).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setStan((row.getCell(10) != null) && !row.getCell(10).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(10).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setEMV((row.getCell(11) != null) && !row.getCell(11).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(11).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setExpiryDate((row.getCell(12) != null && !row.getCell(12).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? Long.valueOf(row.getCell(12).getStringCellValue().replaceAll("\u00a0", "").trim()) : null));
+                        switchRequest.setServiceCode((row.getCell(13) != null) && !row.getCell(13).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(13).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setAadhaarNumber((row.getCell(14) != null) && !row.getCell(14).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(14).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSuperInstId((row.getCell(15) != null) && !row.getCell(15).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(15).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setInstitutionId((row.getCell(16) != null) && !row.getCell(16).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(16).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSponsorBankId((row.getCell(17) != null) && !row.getCell(17).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(17).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSuperMerchantId((row.getCell(18) != null) && !row.getCell(18).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(18).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setGroupMerchantId((row.getCell(19) != null) && !row.getCell(19).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(19).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantId((row.getCell(20) != null) && !row.getCell(20).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(20).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSubMerchantId((row.getCell(21) != null) && !row.getCell(21).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(21).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalId((row.getCell(22) != null) && !row.getCell(22).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(22).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setCardHolderCountryCode((row.getCell(23) != null) && !row.getCell(23).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(23).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalAccNo((row.getCell(24) != null) && !row.getCell(24).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(24).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalCardReadCapability((row.getCell(25) != null) && !row.getCell(25).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(25).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalAuthReadCapability((row.getCell(26) != null) && !row.getCell(26).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(26).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalCardInputMode((row.getCell(27) != null) && !row.getCell(27).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(27).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalOpMode((row.getCell(28) != null) && !row.getCell(28).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(28).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalOpEnv((row.getCell(29) != null) && !row.getCell(29).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(29).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalCardCaptureCapability((row.getCell(30) != null) && !row.getCell(30).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(30).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalCardPresentStatus((row.getCell(31) != null) && !row.getCell(31).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(31).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalCardHolderPresentStatus((row.getCell(32) != null) && !row.getCell(32).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(32).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalOuptutCapability((row.getCell(33) != null) && !row.getCell(33).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(33).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalPINCaptureCapability((row.getCell(34) != null) && !row.getCell(34).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(34).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalAddress((row.getCell(35) != null) && !row.getCell(35).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(35).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalCity((row.getCell(36) != null) && !row.getCell(36).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(36).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalStateCode((row.getCell(37) != null) && !row.getCell(37).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(37).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalCountryCode((row.getCell(38) != null) && !row.getCell(38).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(38).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalType((row.getCell(39) != null) && !row.getCell(39).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(39).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setPANEntryMode((row.getCell(40) != null) && !row.getCell(40).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(40).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setPINEntryCapability((row.getCell(41) != null) && !row.getCell(41).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(41).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setPOSConditionCode((row.getCell(42) != null) && !row.getCell(42).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(42).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantName((row.getCell(43) != null) && !row.getCell(43).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(43).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantCity((row.getCell(44) != null) && !row.getCell(44).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(44).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantStateCode((row.getCell(45) != null) && !row.getCell(45).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(45).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantCountryCode((row.getCell(46) != null) && !row.getCell(46).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(46).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantCategoryCode((row.getCell(47) != null) && !row.getCell(47).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(47).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantType((row.getCell(48) != null) && !row.getCell(48).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(48).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantFraudScore((row.getCell(49) != null) && !row.getCell(49).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(49).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setBillOrInvoiceNumber((row.getCell(50) != null) && !row.getCell(50).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(50).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnDateTime((row.getCell(51) != null) && !row.getCell(51).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(51).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnDate((row.getCell(52) != null) && !row.getCell(52).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(52).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnTime((row.getCell(53) != null) && !row.getCell(53).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(53).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setRRNumber((row.getCell(54) != null) && !row.getCell(54).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(54).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setBatchNumber((row.getCell(55) != null) && !row.getCell(55).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(55).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setInvoiceNumber((row.getCell(56) != null) && !row.getCell(56).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(56).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnCurrencyCode((row.getCell(57) != null) && !row.getCell(57).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(57).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnAmount((row.getCell(58) != null) && !row.getCell(58).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(58).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnBillingAmount((row.getCell(59) != null) && !row.getCell(59).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(59).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnFeeAmount((row.getCell(60) != null) && !row.getCell(60).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(60).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnFeeCurrencyCode((row.getCell(61) != null) && !row.getCell(61).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(61).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnFeeAmountType((row.getCell(62) != null) && !row.getCell(62).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(62).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSettlementAmount((row.getCell(63) != null) && !row.getCell(63).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(63).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSettlementCurrencyCode((row.getCell(64) != null) && !row.getCell(64).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(64).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSettlementDate((row.getCell(65) != null) && !row.getCell(65).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(65).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnAdditionalAmount((row.getCell(66) != null) && !row.getCell(66).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(66).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnAdditionalAmountType((row.getCell(67) != null) && !row.getCell(67).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(67).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnReversalAmount((row.getCell(68) != null) && !row.getCell(68).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(68).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setAdviseReasonCode((row.getCell(69) != null) && !row.getCell(69).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(69).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setAcqInstitutionId((row.getCell(70) != null) && !row.getCell(70).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(70).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setFwdInstitutionId((row.getCell(71) != null) && !row.getCell(71).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(71).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setNetworkSourceId((row.getCell(72) != null) && !row.getCell(72).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(72).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setNetworkDestId((row.getCell(73) != null) && !row.getCell(73).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(73).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTxnIdentifier((row.getCell(74) != null) && !row.getCell(74).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(74).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setAuthResponseCode((row.getCell(75) != null) && !row.getCell(75).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(75).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSrcChannelType((row.getCell(76) != null) && !row.getCell(76).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(76).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSrcRoutingId((row.getCell(77) != null) && !row.getCell(77).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(77).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setDestRoutingId((row.getCell(78) != null) && !row.getCell(78).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(78).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMandatoryCheckStatus((row.getCell(79) != null) && !row.getCell(79).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(79).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantValidationStatus((row.getCell(80) != null) && !row.getCell(80).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(80).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setPVVVerficationStatus((row.getCell(81) != null) && !row.getCell(81).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(81).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setCVVVerficationStatus((row.getCell(82) != null) && !row.getCell(82).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(82).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setCVV2VerficationStatus((row.getCell(83) != null) && !row.getCell(83).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(83).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setEMVValidationStatus((row.getCell(84) != null) && !row.getCell(84).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(84).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setSwitchMode((row.getCell(85) != null) && !row.getCell(85).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(85).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setBinId((row.getCell(86) != null) && !row.getCell(86).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(86).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setBIN((row.getCell(87) != null) && !row.getCell(87).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(87).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setOriginalMTI((row.getCell(88) != null) && !row.getCell(88).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(88).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setOriginalDateTime((row.getCell(89) != null) && !row.getCell(89).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(89).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setOriginalStan((row.getCell(90) != null) && !row.getCell(90).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(90).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setOriginalAcqInstId((row.getCell(91) != null) && !row.getCell(91).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(91).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setOriginalFwdInstId((row.getCell(92) != null) && !row.getCell(92).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(92).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setAuthIndicator((row.getCell(93) != null) && !row.getCell(93).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(93).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setECIndicator((row.getCell(94) != null) && !row.getCell(94).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(94).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setPaySecureIssuerId((row.getCell(95) != null) && !row.getCell(95).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(95).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setNetworkId((row.getCell(96) != null && !row.getCell(96).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? Long.valueOf(row.getCell(96).getStringCellValue().replaceAll("\u00a0", "").trim()) : null));
+                        switchRequest.setPreAuthTimeLimit((row.getCell(97) != null) && !row.getCell(97).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(97).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalIssueId((row.getCell(98) != null) && !row.getCell(98).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(98).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setTerminalComment((row.getCell(99) != null) && !row.getCell(99).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(99).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMerchantMobileNo((row.getCell(100) != null) && !row.getCell(100).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(100).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setCardInfo((row.getCell(101) != null) && !row.getCell(101).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(101).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setMatrixData((row.getCell(102) != null) && !row.getCell(102).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(102).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setIntRefNo((row.getCell(103) != null) && !row.getCell(103).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(103).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setUrn((row.getCell(104) != null) && !row.getCell(104).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(104).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setRefundId((row.getCell(105) != null) && !row.getCell(105).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(105).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setDeviceInvoiceNumber((row.getCell(106) != null) && !row.getCell(106).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(106).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchRequest.setRequestRouteTime(row.getCell(107) != null && !row.getCell(107).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? DateUtil.stringToDate(row.getCell(107).getStringCellValue().replaceAll("\u00a0", "").trim()) : null);
+
+                        switchRequestList.add(switchRequest);
+                        logger.info("Switch Request - Correlation id  - {}", switchRequest.getTxnCorrelationId());
+
+                    }
+
+                    switchRequestRepository.saveAll(switchRequestList);
+                    updatedSwitchRequest = true;
+
+                    logger.info("Switch Request File Inserted Successfully----!!!");
+
+                    //Insertion of Switch Response
+
+                    Sheet switchResponseSheet = workbook.getSheetAt(1);
+                    Iterator<Row> rowIteratorForSwitchResponse = switchResponseSheet.rowIterator();
+
+                    while (rowIteratorForSwitchResponse.hasNext()) {
+                        Row row = rowIteratorForSwitchResponse.next();
+                        // skip first row, as it contains column names
+                        if (row.getRowNum() == 0) {
+                            continue;
+                        }
+
+                        SwitchResponse switchResponse = new SwitchResponse();
+                        switchResponse.setTxnCorrelationId((row.getCell(0) != null) && !row.getCell(0).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(0).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setMTI((row.getCell(1) != null) && !row.getCell(1).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(1).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setStan((row.getCell(2) != null) && !row.getCell(2).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(2).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setTxnDateTimeGMT((row.getCell(3) != null) && !row.getCell(3).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(3).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setRRNumber((row.getCell(4) != null) && !row.getCell(4).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(4).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setTxnResponseCode((row.getCell(5) != null) && !row.getCell(5).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(5).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setAuthResponseCode((row.getCell(6) != null) && !row.getCell(6).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(6).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setAdditionalResponseData((row.getCell(7) != null) && !row.getCell(7).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(7).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setTxnIdentifier((row.getCell(8) != null) && !row.getCell(8).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(8).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setTxnResponseDescription((row.getCell(9) != null) && !row.getCell(9).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(9).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setTxnFailureCode((row.getCell(10) != null) && !row.getCell(10).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(10).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setTxnProcessedBy((row.getCell(11) != null) && !row.getCell(11).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(11).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
+                        switchResponse.setResponseReceivedTime(DateUtil.stringToDate((row.getCell(12) != null) && !row.getCell(12).toString().replaceAll("\u00a0", "").trim().equals("NULL") ? row.getCell(12).getStringCellValue().replaceAll("\u00a0", "").trim() : ""));
+
+                        switchResponseList.add(switchResponse);
+                        logger.info("Switch Response - Correlation id  - {}", switchResponse.getTxnCorrelationId());
+
+                    }
+
+                    switchResponseRepository.saveAll(switchResponseList);
+                    updatedSwitchResponse = true;
+
+                    logger.info("Switch Response Inserted Successfully----!!!");
+                } catch (FileNotFoundException fe) {
+                    logger.info("Switch File not available for " + DateUtil.allTxnDate());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } else {
+                logger.info("Invalid File format");
+            }
+        }
+        return updatedSwitchRequest && updatedSwitchResponse;
+    }
+
+    @Override
+    public boolean generateATFfile(MultipartFile file, String atfFile) throws IOException, SQLException {
+
+        byte[] bytes = file.getBytes();
+        final String filepath = file.getOriginalFilename();
+        Path path = Paths.get(file.getOriginalFilename());
+        Files.write(path, bytes);
+
+        File existingAtfFile = new File(atfFile);
+
+        if (existingAtfFile.delete()) {
+            logger.info("File Deleted");
+        } else {
+            logger.info("File Deletion Failed");
+        }
+
+        CSVWriter csvWriter = new CSVWriter(new FileWriter(atfFile, true), ',', CSVWriter.NO_QUOTE_CHARACTER);
+
+        List<String[]> finalOut = new ArrayList<>();
+        String[] out = null;
+
+        String[] header = {"terminalId", "merchantId", "posDeviceId", "batchNumber", "cardHolderName", "maskedCardNumber", "transactionMode", "invoiceNumber", "acquirerBank", "cardType", "cardNetwork", "cardIssuerCountryCode", "amount", "responseCode", "rrn", "transactionAuthCode",
+                "transactionDate", "responseDate", "transactionId", "orgTransactionID", "transactionType", "status", "Stan", "settlementMode", "settlementStatus"};
+        csvWriter.writeNext(header);
+
+
+        Connection con = null;
+        Statement stmt = null;
+
+
+        con = getConnection();
+        stmt = con.createStatement();
+
+        String fileExtension = "";
+        int index = file.getOriginalFilename().lastIndexOf(".");
+        if (index > 0) {
+            fileExtension = file.getOriginalFilename().substring(index + 1);
+        }
+        if (fileExtension.equals("xlsx")) {
+
+            try {
+                FileInputStream excelFile = new FileInputStream(new File(filepath));
+                Workbook workbook = new XSSFWorkbook(excelFile);
+                Sheet sheet = workbook.getSheetAt(0);
+                Iterator<Row> rowIterator = sheet.rowIterator();
+                while (rowIterator.hasNext()) {
+                    Row row = rowIterator.next();
+                    if (row.getRowNum() == 0) {
+                        continue;// skip first row, as it contains column name
+                    }
+                    Iterator<Cell> cellIterator = row.cellIterator();
+                    while (cellIterator.hasNext()) {
+                        Cell cell = cellIterator.next();
+                        if (cell.getColumnIndex() == 0 && cell.getCellTypeEnum() != CellType.BLANK) {
+                            DataFormatter formatter = new DataFormatter();
+                            String rrnOrtxn = formatter.formatCellValue(sheet.getRow(row.getRowNum()).getCell(cell.getColumnIndex())).replaceAll("\u00a0", "").trim();
+
+
+                           /* Query to fetch ATF from notification Data and Notification Field
+                            When notification data table has nofification field id as 0 (happens in rare case), to map to nofication field table,
+                            we use terminal id and nf. transaction date time with timeframe match with nd response date time with 15 second frame to match the records
+                            */
+
+                            String notificationQuery = "select nd.TerminalId,nd.merchant_Id,nf.pos_Device_Id,nd.batch_number,nf.card_holder_name,nf.masked_card_number," +
+                                    "nf.transaction_mode,nd.invoice_number,nf.acquirer_bank,nf.card_type,nf.card_network,nf.card_issuer_country_code,nf.amount," +
+                                    "nd.response_code,nd.rrn,nd.transaction_auth_code,nd.transaction_date_time,nd.DateTime,nd.TransactionId," +
+                                    "CASE WHEN nd.OrgTransactionId = '' THEN 'null' " +
+                                    "ELSE nd.OrgTransactionId END AS OrgTransactionId," +
+                                    "CASE WHEN nd.OrgTransactionId != '' and nd.TransactionType = 'UPI' THEN 'Reversal' " +
+                                    "ELSE nd.TransactionType END AS TransactionType ,nd.NotificationType as status,nd.Stan,'Auto' as settlement_mode,nd.settlement_status " +
+                                    "FROM notification_data nd " +
+                                    "left join notification_fields nf " +
+                                    "on ( case when nd.notification_fields_id != 0 then nd.notification_fields_id = nf.Id " +
+                                    "     else (nd.TerminalId = nf.TerminalId and nd.invoice_number = nf.invoice_number and nd.batch_number = nf.batch_number) " +
+                                    "     end ) " +
+                                    "where nd.Rrn = '" + rrnOrtxn + "' or nd.TransactionId = '" + rrnOrtxn + "'";
+
+
+                            ResultSet notificationRS = stmt.executeQuery(notificationQuery);
+
+                            List<AtfFileDTO> atfFileDTOFromNotificationList = new ArrayList<>();
+
+
+                            //Load notification result set
+
+                            while (notificationRS.next()) {
+
+                                AtfFileDTO atfFileNotificationDTO = new AtfFileDTO();
+                                atfFileNotificationDTO.setTerminalId(notificationRS.getString("TerminalId"));
+                                atfFileNotificationDTO.setMerchantId(notificationRS.getString("merchant_Id"));
+                                atfFileNotificationDTO.setPosDeviceId(notificationRS.getString("pos_Device_Id"));
+                                atfFileNotificationDTO.setBatchNumber(notificationRS.getString("batch_number"));
+                                atfFileNotificationDTO.setCardHolderName(notificationRS.getString("card_holder_name"));
+                                atfFileNotificationDTO.setMaskedCardNumber(notificationRS.getString("masked_card_number"));
+                                atfFileNotificationDTO.setTransactionMode(notificationRS.getString("transaction_mode"));
+                                atfFileNotificationDTO.setInvoiceNumber(notificationRS.getString("invoice_number"));
+                                atfFileNotificationDTO.setAcquireBank(notificationRS.getString("acquirer_bank"));
+                                atfFileNotificationDTO.setCardType(notificationRS.getString("card_type"));
+                                atfFileNotificationDTO.setCardNetwork(notificationRS.getString("card_network"));
+                                atfFileNotificationDTO.setCardIssuerCountryCode(notificationRS.getString("card_issuer_country_code"));
+                                atfFileNotificationDTO.setAmount(notificationRS.getString("amount"));
+                                atfFileNotificationDTO.setResponseCode(notificationRS.getString("response_code"));
+                                atfFileNotificationDTO.setRrn(notificationRS.getString("rrn"));
+                                atfFileNotificationDTO.setTransactionAuthCode(notificationRS.getString("transaction_auth_code"));
+                                String txnDateTime = notificationRS.getString("transaction_date_time");
+                                if (!txnDateTime.isEmpty() && !txnDateTime.trim().equalsIgnoreCase("NULL")) {
+                                    Date txnDate = DateUtil.stringToDate(txnDateTime.trim());
+                                    atfFileNotificationDTO.setTransactionDate(txnDate);
+                                } else {
+                                    atfFileNotificationDTO.setTransactionDate(null);
+                                }
+
+                                Date responseDateTime = notificationRS.getTimestamp("DateTime");
+                                //if(!responseDateTime.isEmpty()){
+                                //    Date resDate = DateUtil.stringToDate(responseDateTime);
+                                atfFileNotificationDTO.setResponseDate(responseDateTime);
+                                //}
+                                //else {
+                                //    atfFileNotificationDTO.setResponseDate(null);
+                                //}
+
+                                atfFileNotificationDTO.setTransactionId(notificationRS.getString("TransactionId"));
+                                atfFileNotificationDTO.setOrgTransactionId(notificationRS.getString("OrgTransactionId"));
+                                atfFileNotificationDTO.setTransactionType(notificationRS.getString("TransactionType"));
+                                atfFileNotificationDTO.setStatus(notificationRS.getString("status"));
+                                atfFileNotificationDTO.setStan(notificationRS.getString("Stan"));
+                                atfFileNotificationDTO.setSettlementMode(notificationRS.getString("settlement_mode"));
+                                atfFileNotificationDTO.setSettlementStatus(notificationRS.getString("settlement_status"));
+
+                                atfFileDTOFromNotificationList.add(atfFileNotificationDTO);
+
+                            }
+
+                            if (atfFileDTOFromNotificationList.size() > 0) {
+
+                                List<AtfFileDTO> saleAckList = atfFileDTOFromNotificationList.stream().filter(r -> ((r.getTransactionType().equals("Sale") || r.getTransactionType().equals("UPI")) && r.getStatus().equals("ACK"))).collect(Collectors.toList());
+                                List<AtfFileDTO> saleHostList = atfFileDTOFromNotificationList.stream().filter(r -> ((r.getTransactionType().equals("Sale") || r.getTransactionType().equals("UPI")) && r.getStatus().equals("HOST"))).collect(Collectors.toList());
+                                List<AtfFileDTO> saleInitList = atfFileDTOFromNotificationList.stream().filter(r -> ((r.getTransactionType().equals("Sale") || r.getTransactionType().equals("UPI")) && r.getStatus().equals("INIT"))).collect(Collectors.toList());
+                                List<AtfFileDTO> voidHostList = atfFileDTOFromNotificationList.stream().filter(r -> (r.getTransactionType().equals("Void") && r.getStatus().equals("HOST"))).collect(Collectors.toList());
+                                List<AtfFileDTO> voidInitList = atfFileDTOFromNotificationList.stream().filter(r -> (r.getTransactionType().equals("Void") && r.getStatus().equals("INIT"))).collect(Collectors.toList());
+                                List<AtfFileDTO> reversalInitList = atfFileDTOFromNotificationList.stream().filter(r -> (r.getTransactionType().equals("Reversal") && r.getStatus().equals("INIT"))).collect(Collectors.toList());
+
+                                // Set Merchant id, pos device id , batch number, card holder name, masked card number,
+                                // transaction mode, invoice number, acquirer bank, card type, card network,
+                                // card issuer country code to ACk entry from Host entry since records having notification field id as 0 would not have ack entry with the mentioned data.
+
+                                if (saleHostList.size() > 0 && saleAckList.size() > 0) {
+                                    saleAckList.get(0).setMerchantId(saleHostList.get(0).getMerchantId());
+                                    saleAckList.get(0).setPosDeviceId(saleHostList.get(0).getPosDeviceId());
+                                    saleAckList.get(0).setBatchNumber(saleHostList.get(0).getBatchNumber());
+                                    saleAckList.get(0).setCardHolderName(saleHostList.get(0).getCardHolderName());
+                                    saleAckList.get(0).setMaskedCardNumber(saleHostList.get(0).getMaskedCardNumber());
+                                    saleAckList.get(0).setTransactionMode(saleHostList.get(0).getTransactionMode());
+                                    saleAckList.get(0).setInvoiceNumber(saleHostList.get(0).getInvoiceNumber());
+                                    saleAckList.get(0).setAcquireBank(saleHostList.get(0).getAcquireBank());
+                                    saleAckList.get(0).setCardType(saleHostList.get(0).getCardType());
+                                    saleAckList.get(0).setCardNetwork(saleHostList.get(0).getCardNetwork());
+                                    saleAckList.get(0).setCardIssuerCountryCode(saleHostList.get(0).getCardIssuerCountryCode());
+                                    saleAckList.get(0).setAmount(saleHostList.get(0).getAmount());
+                                }
+
+                                // Set Merchant id, pos device id , batch number, card holder name, masked card number,
+                                // transaction mode, invoice number, acquirer bank, card type, card network,
+                                // card issuer country code to HOST entry from INIT entry since records having notification field id as 0 would not have INIT entry with the mentioned data.
+
+                                if (saleInitList.size() > 0 && saleHostList.size() > 0 && saleAckList.size() == 0) {
+                                    saleHostList.get(0).setMerchantId(saleInitList.get(0).getMerchantId());
+                                    saleHostList.get(0).setPosDeviceId(saleInitList.get(0).getPosDeviceId());
+                                    saleHostList.get(0).setBatchNumber(saleInitList.get(0).getBatchNumber());
+                                    saleHostList.get(0).setCardHolderName(saleInitList.get(0).getCardHolderName());
+                                    saleHostList.get(0).setMaskedCardNumber(saleInitList.get(0).getMaskedCardNumber());
+                                    saleHostList.get(0).setTransactionMode(saleInitList.get(0).getTransactionMode());
+                                    saleHostList.get(0).setInvoiceNumber(saleInitList.get(0).getInvoiceNumber());
+                                    saleHostList.get(0).setAcquireBank(saleInitList.get(0).getAcquireBank());
+                                    saleHostList.get(0).setCardType(saleInitList.get(0).getCardType());
+                                    saleHostList.get(0).setCardNetwork(saleInitList.get(0).getCardNetwork());
+                                    saleHostList.get(0).setCardIssuerCountryCode(saleInitList.get(0).getCardIssuerCountryCode());
+                                    saleHostList.get(0).setAmount(saleInitList.get(0).getAmount());
+                                    saleHostList.get(0).setStan(saleInitList.get(0).getStan());
+                                }
+
+                                //set transaction date from INIT Entry
+
+                                if (saleInitList.size() > 0 && saleHostList.size() > 0) {
+                                    if (saleHostList.get(0).getTransactionDate() == null) {
+                                        saleHostList.get(0).setTransactionDate(saleInitList.get(0).getTransactionDate());
+                                    }
+                                }
+                                if (saleInitList.size() > 0 && saleAckList.size() > 0) {
+                                    if (saleAckList.get(0).getTransactionDate() == null) {
+                                        saleAckList.get(0).setTransactionDate(saleInitList.get(0).getTransactionDate());
+                                    }
+                                }
+
+                                Date saleTransactionDate = null;
+                                Date voidTransactionDate = null;
+                                Date reversalTransactionDate = null;
+
+
+                                String[] saleAckData = null;
+                                String[] saleHostData = null;
+                                String[] saleInitData = null;
+                                String[] voidHostData = null;
+                                String[] voidInitData = null;
+                                String[] reversalInitData = null;
+
+
+                                //Sale txns
+                                if (saleAckList.size() > 0) {
+
+                                    saleTransactionDate = saleAckList.get(0).getTransactionDate() != null ? saleAckList.get(0).getTransactionDate() : null;
+
+                                    String txnDateStr = saleAckList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(saleAckList.get(0).getTransactionDate()) : "";
+                                    String resDateStr = saleAckList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(saleAckList.get(0).getResponseDate()) : "";
+                                    saleAckData = new String[]{saleAckList.get(0).getTerminalId(), saleAckList.get(0).getMerchantId(), saleAckList.get(0).getPosDeviceId(),
+                                            saleAckList.get(0).getBatchNumber(), saleAckList.get(0).getCardHolderName(), saleAckList.get(0).getMaskedCardNumber(),
+                                            saleAckList.get(0).getTransactionMode(), saleAckList.get(0).getInvoiceNumber(), saleAckList.get(0).getAcquireBank(),
+                                            saleAckList.get(0).getCardType(), saleAckList.get(0).getCardNetwork(), saleAckList.get(0).getCardIssuerCountryCode(),
+                                            saleAckList.get(0).getAmount(), saleAckList.get(0).getResponseCode(), saleAckList.get(0).getRrn(),
+                                            saleAckList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                            saleAckList.get(0).getTransactionId(), saleAckList.get(0).getOrgTransactionId(), saleAckList.get(0).getTransactionType(),
+                                            saleAckList.get(0).getStatus(), saleAckList.get(0).getStan(), saleAckList.get(0).getSettlementMode(), saleAckList.get(0).getSettlementStatus()};
+
+
+                                }
+
+                                if (saleHostList.size() > 0) {
+
+                                    saleTransactionDate = saleHostList.get(0).getTransactionDate() != null ? saleHostList.get(0).getTransactionDate() : null;
+
+                                    String txnDateStr = saleHostList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(saleHostList.get(0).getTransactionDate()) : "";
+                                    String resDateStr = saleHostList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(saleHostList.get(0).getResponseDate()) : "";
+
+                                    saleHostData = new String[]{saleHostList.get(0).getTerminalId(), saleHostList.get(0).getMerchantId(), saleHostList.get(0).getPosDeviceId(),
+                                            saleHostList.get(0).getBatchNumber(), saleHostList.get(0).getCardHolderName(), saleHostList.get(0).getMaskedCardNumber(),
+                                            saleHostList.get(0).getTransactionMode(), saleHostList.get(0).getInvoiceNumber(), saleHostList.get(0).getAcquireBank(),
+                                            saleHostList.get(0).getCardType(), saleHostList.get(0).getCardNetwork(), saleHostList.get(0).getCardIssuerCountryCode(),
+                                            saleHostList.get(0).getAmount(), saleHostList.get(0).getResponseCode(), saleHostList.get(0).getRrn(),
+                                            saleHostList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                            saleHostList.get(0).getTransactionId(), saleHostList.get(0).getOrgTransactionId(), saleHostList.get(0).getTransactionType(),
+                                            saleHostList.get(0).getStatus(), saleHostList.get(0).getStan(), saleHostList.get(0).getSettlementMode(), saleHostList.get(0).getSettlementStatus()};
+
+                                }
+
+                                if (saleInitList.size() > 0) {
+
+                                    saleTransactionDate = saleInitList.get(0).getTransactionDate() != null ? saleInitList.get(0).getTransactionDate() : null;
+
+                                    String txnDateStr = saleInitList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(saleInitList.get(0).getTransactionDate()) : "";
+                                    String resDateStr = saleInitList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(saleInitList.get(0).getResponseDate()) : "";
+
+                                    saleInitData = new String[]{saleInitList.get(0).getTerminalId(), saleInitList.get(0).getMerchantId(), saleInitList.get(0).getPosDeviceId(),
+                                            saleInitList.get(0).getBatchNumber(), saleInitList.get(0).getCardHolderName(), saleInitList.get(0).getMaskedCardNumber(),
+                                            saleInitList.get(0).getTransactionMode(), saleInitList.get(0).getInvoiceNumber(), saleInitList.get(0).getAcquireBank(),
+                                            saleInitList.get(0).getCardType(), saleInitList.get(0).getCardNetwork(), saleInitList.get(0).getCardIssuerCountryCode(),
+                                            saleInitList.get(0).getAmount(), saleInitList.get(0).getResponseCode(), saleInitList.get(0).getRrn(),
+                                            saleInitList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                            saleInitList.get(0).getTransactionId(), saleInitList.get(0).getOrgTransactionId(), saleInitList.get(0).getTransactionType(),
+                                            saleInitList.get(0).getStatus(), saleInitList.get(0).getStan(), saleInitList.get(0).getSettlementMode(), saleInitList.get(0).getSettlementStatus()};
+
+                                }
+
+                                //void txns
+                                if (voidHostList.size() > 0) {
+
+                                    voidTransactionDate = voidHostList.get(0).getTransactionDate() != null ? voidHostList.get(0).getTransactionDate() : null;
+
+                                    String txnDateStr = voidHostList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(voidHostList.get(0).getTransactionDate()) : "";
+                                    String resDateStr = voidHostList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(voidHostList.get(0).getResponseDate()) : "";
+
+                                    voidHostData = new String[]{voidHostList.get(0).getTerminalId(), voidHostList.get(0).getMerchantId(), voidHostList.get(0).getPosDeviceId(),
+                                            voidHostList.get(0).getBatchNumber(), voidHostList.get(0).getCardHolderName(), voidHostList.get(0).getMaskedCardNumber(),
+                                            voidHostList.get(0).getTransactionMode(), voidHostList.get(0).getInvoiceNumber(), voidHostList.get(0).getAcquireBank(),
+                                            voidHostList.get(0).getCardType(), voidHostList.get(0).getCardNetwork(), voidHostList.get(0).getCardIssuerCountryCode(),
+                                            voidHostList.get(0).getAmount(), voidHostList.get(0).getResponseCode(), voidHostList.get(0).getRrn(),
+                                            voidHostList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                            voidHostList.get(0).getTransactionId(), voidHostList.get(0).getOrgTransactionId(), voidHostList.get(0).getTransactionType(),
+                                            voidHostList.get(0).getStatus(), voidHostList.get(0).getStan(), voidHostList.get(0).getSettlementMode(), voidHostList.get(0).getSettlementStatus()};
+
+                                }
+
+                                if (voidInitList.size() > 0) {
+
+                                    voidTransactionDate = voidInitList.get(0).getTransactionDate() != null ? voidInitList.get(0).getTransactionDate() : null;
+
+                                    String txnDateStr = voidInitList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(voidInitList.get(0).getTransactionDate()) : "";
+                                    String resDateStr = voidInitList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(voidInitList.get(0).getResponseDate()) : "";
+
+                                    voidInitData = new String[]{voidInitList.get(0).getTerminalId(), voidInitList.get(0).getMerchantId(), voidInitList.get(0).getPosDeviceId(),
+                                            voidInitList.get(0).getBatchNumber(), voidInitList.get(0).getCardHolderName(), voidInitList.get(0).getMaskedCardNumber(),
+                                            voidInitList.get(0).getTransactionMode(), voidInitList.get(0).getInvoiceNumber(), voidInitList.get(0).getAcquireBank(),
+                                            voidInitList.get(0).getCardType(), voidInitList.get(0).getCardNetwork(), voidInitList.get(0).getCardIssuerCountryCode(),
+                                            voidInitList.get(0).getAmount(), voidInitList.get(0).getResponseCode(), voidInitList.get(0).getRrn(),
+                                            voidInitList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                            voidInitList.get(0).getTransactionId(), voidInitList.get(0).getOrgTransactionId(), voidInitList.get(0).getTransactionType(),
+                                            voidInitList.get(0).getStatus(), voidInitList.get(0).getStan(), voidInitList.get(0).getSettlementMode(), voidInitList.get(0).getSettlementStatus()};
+
+                                }
+
+                                //Init Reversals
+                                if (reversalInitList.size() > 0) {
+
+                                    reversalTransactionDate = reversalInitList.get(0).getTransactionDate() != null ? reversalInitList.get(0).getTransactionDate() : null;
+
+                                    String txnDateStr = reversalInitList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(reversalInitList.get(0).getTransactionDate()) : "";
+                                    String resDateStr = reversalInitList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(reversalInitList.get(0).getResponseDate()) : "";
+
+                                    reversalInitData = new String[]{reversalInitList.get(0).getTerminalId(), reversalInitList.get(0).getMerchantId(), reversalInitList.get(0).getPosDeviceId(),
+                                            reversalInitList.get(0).getBatchNumber(), reversalInitList.get(0).getCardHolderName(), reversalInitList.get(0).getMaskedCardNumber(),
+                                            reversalInitList.get(0).getTransactionMode(), reversalInitList.get(0).getInvoiceNumber(), reversalInitList.get(0).getAcquireBank(),
+                                            reversalInitList.get(0).getCardType(), reversalInitList.get(0).getCardNetwork(), reversalInitList.get(0).getCardIssuerCountryCode(),
+                                            reversalInitList.get(0).getAmount(), reversalInitList.get(0).getResponseCode(), reversalInitList.get(0).getRrn(),
+                                            reversalInitList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                            reversalInitList.get(0).getTransactionId(), reversalInitList.get(0).getOrgTransactionId(), reversalInitList.get(0).getTransactionType(),
+                                            reversalInitList.get(0).getStatus(), reversalInitList.get(0).getStan(), reversalInitList.get(0).getSettlementMode(), reversalInitList.get(0).getSettlementStatus()};
+
+                                }
+
+
+                                Date saleTxnCutOffDate = saleTransactionDate != null ? DateUtil.stringToDate(DateUtil.parseDateFromDateTime(saleTransactionDate).concat(" 23:00:00")) : null;
+
+                                String updatedSettlementStatus = "";
+                                if (saleTransactionDate != null && saleTxnCutOffDate != null && saleTransactionDate.before(saleTxnCutOffDate) && (voidTransactionDate != null && voidTransactionDate.before(saleTxnCutOffDate) || (reversalTransactionDate != null && reversalTransactionDate.before(saleTxnCutOffDate)))) {
+                                    updatedSettlementStatus = "NotSettled";
+                                } else if (saleInitData != null && saleHostData == null && saleAckData == null) {               // Means only sale/UPI  INIT available
+                                    updatedSettlementStatus = "NotSettled";
+                                } else if (saleHostData != null && saleHostData[13] != null && !saleHostData[13].equals("00")) {  // Means txn having host with response code as not 00
+                                    updatedSettlementStatus = "NotSettled";
+                                } else {
+                                    updatedSettlementStatus = "Settled";
+                                }
+
+
+                                //Below snippet for setting the Settlement Status and write into ATF File
+
+                                if (saleAckData != null) {
+                                    saleAckData[24] = updatedSettlementStatus;
+                                    csvWriter.writeNext(saleAckData);
+                                    logger.info("Notification : Generated for txn -- {}", saleAckData[18]);
+                                } else if (saleHostData != null) {
+                                    saleHostData[24] = updatedSettlementStatus;
+                                    csvWriter.writeNext(saleHostData);
+                                    logger.info("Notification : Generated for txn -- {}", saleHostData[18]);
+                                } else if (saleInitData != null) {
+                                    saleInitData[24] = updatedSettlementStatus;
+                                    csvWriter.writeNext(saleInitData);
+                                    logger.info("Notification : Generated for txn -- {}", saleInitData[18]);
+                                }
+
+                                if (voidHostData != null) {
+                                    voidHostData[24] = updatedSettlementStatus;
+                                    csvWriter.writeNext(voidHostData);
+                                    logger.info("Notification : Generated for txn -- {}", voidHostData[18]);
+                                } else if (voidInitData != null) {
+                                    voidInitData[24] = updatedSettlementStatus;
+                                    csvWriter.writeNext(voidInitData);
+                                    logger.info("Notification : Generated for txn -- {}", voidInitData[18]);
+                                }
+
+                                if (reversalInitData != null) {
+                                    reversalInitData[24] = updatedSettlementStatus;
+                                    csvWriter.writeNext(reversalInitData);
+                                    logger.info("Notification : Generated for txn -- {}", reversalInitData[18]);
+                                }
+
+                            } else {
+
+                                //if not present in notification data and notification fields imported table ,
+                                //fetch from switch request and response imported table.
+
+                                String switchReqResQuery = "select sreq.TerminalId,sreq.MerchantId AS merchant_Id, null AS pos_Device_id, sreq.BatchNumber AS batch_number, null AS card_holder_name, \n" +
+                                        "CASE WHEN sreq.MTI = '0100' THEN ''\n" +
+                                        "ELSE CONCAT(sreq.BIN,\"******\",sreq.CardInfo) END AS masked_card_number, \n" +
+                                        "CASE WHEN sreq.PANEntryMode = '07' THEN 'NFC' \n" +
+                                        "WHEN sreq.PANEntryMode = '05' THEN 'EMV' \n" +
+                                        "WHEN (sreq.PANEntryMode = '90' OR sreq.PANEntryMode = '80') THEN 'Magstripe' " +
+                                        "WHEN sreq.MTI = '0100' THEN 'UPI' END AS transaction_mode, \n" +
+                                        "CASE WHEN sreq.DeviceInvoiceNumber != ''  THEN sreq.DeviceInvoiceNumber " +
+                                        "else sreq.InvoiceNumber end As invoice_number ,'AXIS BANK' AS acquirer_bank, null AS card_type, \n" +
+                                        "null AS card_network, '0356' AS card_issuer_country_code, " +
+                                        "CASE WHEN sreq.MTI = '0200' AND sreq.TXNTYPE = '02' THEN sreq.TxnAdditionalAmount \n" +
+                                        "ELSE sreq.TxnAmount END AS amount, \n" +
+                                        "sres.TxnResponseCode AS response_code, \n" +
+                                        "sres.RRNumber AS rrn, sres.AuthResponseCode AS transaction_auth_code , sreq.RequestRouteTime AS transaction_date_time, sres.ResponseReceivedTime AS response_date_time, \n" +
+                                        "CASE WHEN sreq.MTI = '0100' THEN sreq.InvoiceNumber \n" +
+                                        "WHEN sreq.MTI = '0200' THEN CONCAT(sreq.TerminalId, DATE_FORMAT(sreq.RequestRouteTime,'%Y%m%d%H%i%S')) END  AS TransactionId, null as OrgTransactionId,\n" +
+                                        "CASE WHEN sreq.MTI = '0100' AND (sreq.TXNTYPE = '36' OR sreq.TXNTYPE = '37' OR sreq.TXNTYPE = '39') THEN 'UPI'\n" +
+                                        "WHEN sreq.MTI = '0200' AND sreq.TXNTYPE = '00' THEN 'Sale'\n" +
+                                        "WHEN sreq.MTI = '0200' AND sreq.TXNTYPE = '02' THEN 'Void'\n" +
+                                        "WHEN ((sreq.MTI = '0400' AND sreq.TXNTYPE = '00') OR (sreq.MTI = '0100' AND sreq.TXNTYPE = '38')) THEN 'Reversal' END AS TransactionType,\n" +
+                                        "CASE WHEN sres.MTI = '0210' THEN 'HOST'\n" +
+                                        "WHEN sres.MTI = '0410' THEN 'INIT'\n" +
+                                        "WHEN sreq.MTI = '0100' AND (sreq.TXNTYPE = '36' OR sreq.TXNTYPE = '38') THEN 'INIT'\n" +
+                                        "WHEN sreq.MTI = '0100' AND (sreq.TXNTYPE = '37' OR sreq.TXNTYPE = '39') THEN 'HOST'\n" +
+                                        "WHEN sreq.MTI = '0300' AND sreq.TXNTYPE = '51' THEN 'ACK'\n" +
+                                        "WHEN sreq.MTI = '0200' AND sreq.TXNTYPE = '00' THEN 'INIT' END AS status,\n" +
+                                        "sres.Stan, 'Auto' as settlement_mode,\n" +
+                                        "null AS settlement_status\n" +
+                                        "FROM switch_response sres \n" +
+                                        "LEFT JOIN switch_request sreq on sres.TxnCorrelationId = sreq.TxnCorrelationId \n" +
+                                        "WHERE sres.RRNumber ='" + rrnOrtxn + "' or CONCAT(sreq.TerminalId, DATE_FORMAT(sreq.RequestRouteTime,'%Y%m%d%H%i%S')) = '" + rrnOrtxn + "' or " +
+                                        "sreq.InvoiceNumber = '" + rrnOrtxn + "';";
+
+                                ResultSet switchReqResRS = stmt.executeQuery(switchReqResQuery);
+
+                                List<AtfFileDTO> atfFileDTOFromSwitchList = new ArrayList<>();
+
+
+                                //Load notification result set
+
+                                while (switchReqResRS.next()) {
+
+                                    AtfFileDTO atfFileFromSwitchDTO = new AtfFileDTO();
+                                    atfFileFromSwitchDTO.setTerminalId(switchReqResRS.getString("TerminalId"));
+                                    atfFileFromSwitchDTO.setMerchantId(switchReqResRS.getString("merchant_Id"));
+                                    atfFileFromSwitchDTO.setPosDeviceId(switchReqResRS.getString("pos_Device_Id"));
+                                    atfFileFromSwitchDTO.setBatchNumber(switchReqResRS.getString("batch_number"));
+                                    atfFileFromSwitchDTO.setCardHolderName(switchReqResRS.getString("card_holder_name"));
+                                    atfFileFromSwitchDTO.setMaskedCardNumber(switchReqResRS.getString("masked_card_number"));
+                                    atfFileFromSwitchDTO.setTransactionMode(switchReqResRS.getString("transaction_mode"));
+                                    atfFileFromSwitchDTO.setInvoiceNumber(switchReqResRS.getString("invoice_number"));
+                                    atfFileFromSwitchDTO.setAcquireBank(switchReqResRS.getString("acquirer_bank"));
+                                    atfFileFromSwitchDTO.setCardType(switchReqResRS.getString("card_type"));
+                                    atfFileFromSwitchDTO.setCardNetwork(switchReqResRS.getString("card_network"));
+                                    atfFileFromSwitchDTO.setCardIssuerCountryCode(switchReqResRS.getString("card_issuer_country_code"));
+                                    atfFileFromSwitchDTO.setAmount(switchReqResRS.getString("amount"));
+                                    atfFileFromSwitchDTO.setResponseCode(switchReqResRS.getString("response_code"));
+                                    atfFileFromSwitchDTO.setRrn(switchReqResRS.getString("rrn"));
+                                    atfFileFromSwitchDTO.setTransactionAuthCode(switchReqResRS.getString("transaction_auth_code"));
+                                    String txnDateTime = switchReqResRS.getString("transaction_date_time");
+                                    if (!txnDateTime.isEmpty()) {
+                                        Date txnDate = DateUtil.stringToDate(txnDateTime);
+                                        atfFileFromSwitchDTO.setTransactionDate(txnDate);
+                                    } else {
+                                        atfFileFromSwitchDTO.setTransactionDate(null);
+                                    }
+
+                                    String responseDateTime = switchReqResRS.getString("response_date_time");
+                                    if (!responseDateTime.isEmpty()) {
+                                        Date resDate = DateUtil.stringToDate(responseDateTime);
+                                        atfFileFromSwitchDTO.setResponseDate(resDate);
+                                    } else {
+                                        atfFileFromSwitchDTO.setResponseDate(null);
+                                    }
+
+                                    atfFileFromSwitchDTO.setTransactionId(switchReqResRS.getString("TransactionId"));
+                                    atfFileFromSwitchDTO.setOrgTransactionId(switchReqResRS.getString("OrgTransactionId"));
+                                    atfFileFromSwitchDTO.setTransactionType(switchReqResRS.getString("TransactionType"));
+                                    atfFileFromSwitchDTO.setStatus(switchReqResRS.getString("status"));
+                                    atfFileFromSwitchDTO.setStan(switchReqResRS.getString("Stan"));
+                                    atfFileFromSwitchDTO.setSettlementMode(switchReqResRS.getString("settlement_mode"));
+                                    atfFileFromSwitchDTO.setSettlementStatus(switchReqResRS.getString("settlement_status"));
+
+                                    atfFileDTOFromSwitchList.add(atfFileFromSwitchDTO);
+
+                                }
+
+                                if (atfFileDTOFromSwitchList.size() > 0) {
+
+                                    List<AtfFileDTO> saleAckList = atfFileDTOFromSwitchList.stream().filter(r -> ("ACK".equals(r.getStatus()))).collect(Collectors.toList());
+                                    List<AtfFileDTO> saleHostList = atfFileDTOFromSwitchList.stream().filter(r -> r.getTransactionType() != null && ((r.getTransactionType().equalsIgnoreCase("Sale") || r.getTransactionType().equalsIgnoreCase("UPI")) && "HOST".equals(r.getStatus()))).collect(Collectors.toList());
+                                    List<AtfFileDTO> saleInitList = atfFileDTOFromSwitchList.stream().filter(r -> r.getTransactionType() != null && ((r.getTransactionType().equalsIgnoreCase("Sale") || r.getTransactionType().equalsIgnoreCase("UPI")) && "INIT".equals(r.getStatus()))).collect(Collectors.toList());
+                                    List<AtfFileDTO> voidHostList = atfFileDTOFromSwitchList.stream().filter(r -> r.getTransactionType() != null && (r.getTransactionType().equalsIgnoreCase("Void") && "HOST".equals(r.getStatus()))).collect(Collectors.toList());
+                                    List<AtfFileDTO> voidInitList = atfFileDTOFromSwitchList.stream().filter(r -> r.getTransactionType() != null && (r.getTransactionType().equalsIgnoreCase("Void") && "INIT".equals(r.getStatus()))).collect(Collectors.toList());
+                                    List<AtfFileDTO> reversalInitList = atfFileDTOFromSwitchList.stream().filter(r -> r.getTransactionType() != null && (r.getTransactionType().equalsIgnoreCase("Reversal") && "INIT".equals(r.getStatus()))).collect(Collectors.toList());
+
+
+                                    //for ACK record, we sets the Sales or UPI datas for batch number, masked card number,
+                                    // Transaction Mode, Invoice Number, Amount, Transaction Auth Code, TransactionId  and  Transaction Type
+
+                                    if (saleAckList.size() > 0) {
+                                        if (saleHostList.size() > 0) {
+                                            saleAckList.get(0).setBatchNumber(saleHostList.get(0).getBatchNumber());
+                                            saleAckList.get(0).setMaskedCardNumber(saleHostList.get(0).getMaskedCardNumber());
+                                            saleAckList.get(0).setTransactionMode(saleHostList.get(0).getTransactionMode());
+                                            saleAckList.get(0).setInvoiceNumber(saleHostList.get(0).getInvoiceNumber());
+                                            saleAckList.get(0).setAmount(saleHostList.get(0).getAmount());
+                                            saleAckList.get(0).setTransactionAuthCode(saleHostList.get(0).getTransactionAuthCode());
+                                            saleAckList.get(0).setTransactionId(saleHostList.get(0).getTransactionId());
+                                            saleAckList.get(0).setTransactionType(saleHostList.get(0).getTransactionType());
+                                        } else if (saleInitList.size() > 0) {
+                                            saleAckList.get(0).setBatchNumber(saleInitList.get(0).getBatchNumber());
+                                            saleAckList.get(0).setMaskedCardNumber(saleInitList.get(0).getMaskedCardNumber());
+                                            saleAckList.get(0).setTransactionMode(saleInitList.get(0).getTransactionMode());
+                                            saleAckList.get(0).setInvoiceNumber(saleInitList.get(0).getInvoiceNumber());
+                                            saleAckList.get(0).setAmount(saleInitList.get(0).getAmount());
+                                            saleAckList.get(0).setTransactionAuthCode(saleInitList.get(0).getTransactionAuthCode());
+                                            saleAckList.get(0).setTransactionType(saleInitList.get(0).getTransactionType());
+                                        }
+                                    }
+
+                                    //Set the Original Transaction Id for Reversal Entry
+                                    //For Sale : gets the previous transaction id and set as Original transaction id and transaction id
+                                    //For UPI : gets the previous transaction id and set as Original transaction id
+
+                                    if (reversalInitList.size() > 0) {
+
+                                        if (saleAckList.size() > 0) {
+                                            if (saleAckList.get(0).getTransactionType() != null && saleAckList.get(0).getTransactionType().equalsIgnoreCase("Sale")) {
+                                                reversalInitList.get(0).setOrgTransactionId(saleAckList.get(0).getTransactionId());
+                                                reversalInitList.get(0).setTransactionId(saleAckList.get(0).getTransactionId());
+                                            } else if (saleAckList.get(0).getTransactionType() != null && saleAckList.get(0).getTransactionType().equalsIgnoreCase("UPI")) {
+                                                reversalInitList.get(0).setOrgTransactionId(saleAckList.get(0).getTransactionId());
+                                            }
+
+                                        } else if (saleHostList.size() > 0) {
+                                            if (saleHostList.get(0).getTransactionType() != null && saleHostList.get(0).getTransactionType().equalsIgnoreCase("Sale")) {
+                                                reversalInitList.get(0).setOrgTransactionId(saleHostList.get(0).getTransactionId());
+                                                reversalInitList.get(0).setTransactionId(saleHostList.get(0).getTransactionId());
+                                            } else if (saleHostList.get(0).getTransactionType() != null && saleHostList.get(0).getTransactionType().equalsIgnoreCase("UPI")) {
+                                                reversalInitList.get(0).setOrgTransactionId(saleHostList.get(0).getTransactionId());
+                                            }
+
+                                        } else if (saleInitList.size() > 0) {
+                                            if (saleInitList.get(0).getTransactionType() != null && saleInitList.get(0).getTransactionType().equalsIgnoreCase("Sale")) {
+                                                reversalInitList.get(0).setOrgTransactionId(saleInitList.get(0).getTransactionId());
+                                                reversalInitList.get(0).setTransactionId(saleInitList.get(0).getTransactionId());
+                                            } else if (saleInitList.get(0).getTransactionType() != null && saleInitList.get(0).getTransactionType().equalsIgnoreCase("UPI")) {
+                                                reversalInitList.get(0).setOrgTransactionId(saleInitList.get(0).getTransactionId());
+                                            }
+                                        }
+                                    }
+
+                                    //Set the Original Transaction Id for Void Entry
+                                    //For Sale :  for Reversal we will get the previous transaction id and set as Original transaction id and transaction id
+                                    if (voidHostList.size() > 0) {
+
+                                        if (saleAckList.size() > 0) {
+                                            voidHostList.get(0).setOrgTransactionId(saleAckList.get(0).getTransactionId());
+                                        } else if (saleHostList.size() > 0) {
+                                            voidHostList.get(0).setOrgTransactionId(saleAckList.get(0).getTransactionId());
+                                        } else if (saleInitList.size() > 0) {
+                                            voidHostList.get(0).setOrgTransactionId(saleAckList.get(0).getTransactionId());
+                                        }
+
+                                    } else if (voidInitList.size() > 0) {
+                                        if (saleAckList.size() > 0) {
+                                            voidInitList.get(0).setOrgTransactionId(voidInitList.get(0).getTransactionId());
+                                        } else if (saleHostList.size() > 0) {
+                                            voidInitList.get(0).setOrgTransactionId(voidInitList.get(0).getTransactionId());
+                                        } else if (saleInitList.size() > 0) {
+                                            voidInitList.get(0).setOrgTransactionId(voidInitList.get(0).getTransactionId());
+                                        }
+                                    }
+
+
+                                    Date saleTransactionDate = null;
+                                    Date voidTransactionDate = null;
+                                    Date reversalTransactionDate = null;
+
+
+                                    String[] saleAckData = null;
+                                    String[] saleHostData = null;
+                                    String[] saleInitData = null;
+                                    String[] voidHostData = null;
+                                    String[] voidInitData = null;
+                                    String[] reversalInitData = null;
+
+
+                                    //Sale txns
+                                    if (saleAckList.size() > 0) {
+
+                                        saleTransactionDate = saleAckList.get(0).getTransactionDate() != null ? saleAckList.get(0).getTransactionDate() : null;
+
+                                        String txnDateStr = saleAckList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(saleAckList.get(0).getTransactionDate()) : "";
+                                        String resDateStr = saleAckList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(saleAckList.get(0).getResponseDate()) : "";
+
+                                        saleAckData = new String[]{saleAckList.get(0).getTerminalId(), saleAckList.get(0).getMerchantId(), saleAckList.get(0).getPosDeviceId(),
+                                                saleAckList.get(0).getBatchNumber(), saleAckList.get(0).getCardHolderName(), saleAckList.get(0).getMaskedCardNumber(),
+                                                saleAckList.get(0).getTransactionMode(), saleAckList.get(0).getInvoiceNumber(), saleAckList.get(0).getAcquireBank(),
+                                                saleAckList.get(0).getCardType(), saleAckList.get(0).getCardNetwork(), saleAckList.get(0).getCardIssuerCountryCode(),
+                                                saleAckList.get(0).getAmount(), saleAckList.get(0).getResponseCode(), saleAckList.get(0).getRrn(),
+                                                saleAckList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                                saleAckList.get(0).getTransactionId(), saleAckList.get(0).getOrgTransactionId(), saleAckList.get(0).getTransactionType(),
+                                                saleAckList.get(0).getStatus(), saleAckList.get(0).getStan(), saleAckList.get(0).getSettlementMode(), saleAckList.get(0).getSettlementStatus()};
+
+                                    }
+
+                                    if (saleHostList.size() > 0) {
+
+                                        saleTransactionDate = saleHostList.get(0).getTransactionDate() != null ? saleHostList.get(0).getTransactionDate() : null;
+
+                                        String txnDateStr = saleHostList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(saleHostList.get(0).getTransactionDate()) : "";
+                                        String resDateStr = saleHostList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(saleHostList.get(0).getResponseDate()) : "";
+
+                                        saleHostData = new String[]{saleHostList.get(0).getTerminalId(), saleHostList.get(0).getMerchantId(), saleHostList.get(0).getPosDeviceId(),
+                                                saleHostList.get(0).getBatchNumber(), saleHostList.get(0).getCardHolderName(), saleHostList.get(0).getMaskedCardNumber(),
+                                                saleHostList.get(0).getTransactionMode(), saleHostList.get(0).getInvoiceNumber(), saleHostList.get(0).getAcquireBank(),
+                                                saleHostList.get(0).getCardType(), saleHostList.get(0).getCardNetwork(), saleHostList.get(0).getCardIssuerCountryCode(),
+                                                saleHostList.get(0).getAmount(), saleHostList.get(0).getResponseCode(), saleHostList.get(0).getRrn(),
+                                                saleHostList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                                saleHostList.get(0).getTransactionId(), saleHostList.get(0).getOrgTransactionId(), saleHostList.get(0).getTransactionType(),
+                                                saleHostList.get(0).getStatus(), saleHostList.get(0).getStan(), saleHostList.get(0).getSettlementMode(), saleHostList.get(0).getSettlementStatus()};
+
+                                    }
+
+                                    if (saleInitList.size() > 0) {
+
+                                        saleTransactionDate = saleInitList.get(0).getTransactionDate() != null ? saleInitList.get(0).getTransactionDate() : null;
+
+                                        String txnDateStr = saleInitList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(saleInitList.get(0).getTransactionDate()) : "";
+                                        String resDateStr = saleInitList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(saleInitList.get(0).getResponseDate()) : "";
+
+                                        saleInitData = new String[]{saleInitList.get(0).getTerminalId(), saleInitList.get(0).getMerchantId(), saleInitList.get(0).getPosDeviceId(),
+                                                saleInitList.get(0).getBatchNumber(), saleInitList.get(0).getCardHolderName(), saleInitList.get(0).getMaskedCardNumber(),
+                                                saleInitList.get(0).getTransactionMode(), saleInitList.get(0).getInvoiceNumber(), saleInitList.get(0).getAcquireBank(),
+                                                saleInitList.get(0).getCardType(), saleInitList.get(0).getCardNetwork(), saleInitList.get(0).getCardIssuerCountryCode(),
+                                                saleInitList.get(0).getAmount(), saleInitList.get(0).getResponseCode(), saleInitList.get(0).getRrn(),
+                                                saleInitList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                                saleInitList.get(0).getTransactionId(), saleInitList.get(0).getOrgTransactionId(), saleInitList.get(0).getTransactionType(),
+                                                saleInitList.get(0).getStatus(), saleInitList.get(0).getStan(), saleInitList.get(0).getSettlementMode(), saleInitList.get(0).getSettlementStatus()};
+
+                                    }
+
+                                    //void txns
+                                    if (voidHostList.size() > 0) {
+
+                                        voidTransactionDate = voidHostList.get(0).getTransactionDate() != null ? voidHostList.get(0).getTransactionDate() : null;
+
+                                        String txnDateStr = voidHostList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(voidHostList.get(0).getTransactionDate()) : "";
+                                        String resDateStr = voidHostList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(voidHostList.get(0).getResponseDate()) : "";
+
+                                        voidHostData = new String[]{voidHostList.get(0).getTerminalId(), voidHostList.get(0).getMerchantId(), voidHostList.get(0).getPosDeviceId(),
+                                                voidHostList.get(0).getBatchNumber(), voidHostList.get(0).getCardHolderName(), voidHostList.get(0).getMaskedCardNumber(),
+                                                voidHostList.get(0).getTransactionMode(), voidHostList.get(0).getInvoiceNumber(), voidHostList.get(0).getAcquireBank(),
+                                                voidHostList.get(0).getCardType(), voidHostList.get(0).getCardNetwork(), voidHostList.get(0).getCardIssuerCountryCode(),
+                                                voidHostList.get(0).getAmount(), voidHostList.get(0).getResponseCode(), voidHostList.get(0).getRrn(),
+                                                voidHostList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                                voidHostList.get(0).getTransactionId(), voidHostList.get(0).getOrgTransactionId(), voidHostList.get(0).getTransactionType(),
+                                                voidHostList.get(0).getStatus(), voidHostList.get(0).getStan(), voidHostList.get(0).getSettlementMode(), voidHostList.get(0).getSettlementStatus()};
+
+                                    }
+
+                                    if (voidInitList.size() > 0) {
+
+                                        voidTransactionDate = voidInitList.get(0).getTransactionDate() != null ? voidInitList.get(0).getTransactionDate() : null;
+
+                                        String txnDateStr = voidInitList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(voidInitList.get(0).getTransactionDate()) : "";
+                                        String resDateStr = voidInitList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(voidInitList.get(0).getResponseDate()) : "";
+
+                                        voidInitData = new String[]{voidInitList.get(0).getTerminalId(), voidInitList.get(0).getMerchantId(), voidInitList.get(0).getPosDeviceId(),
+                                                voidInitList.get(0).getBatchNumber(), voidInitList.get(0).getCardHolderName(), voidInitList.get(0).getMaskedCardNumber(),
+                                                voidInitList.get(0).getTransactionMode(), voidInitList.get(0).getInvoiceNumber(), voidInitList.get(0).getAcquireBank(),
+                                                voidInitList.get(0).getCardType(), voidInitList.get(0).getCardNetwork(), voidInitList.get(0).getCardIssuerCountryCode(),
+                                                voidInitList.get(0).getAmount(), voidInitList.get(0).getResponseCode(), voidInitList.get(0).getRrn(),
+                                                voidInitList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                                voidInitList.get(0).getTransactionId(), voidInitList.get(0).getOrgTransactionId(), voidInitList.get(0).getTransactionType(),
+                                                voidInitList.get(0).getStatus(), voidInitList.get(0).getStan(), voidInitList.get(0).getSettlementMode(), voidInitList.get(0).getSettlementStatus()};
+
+                                    }
+
+                                    //Init Reversals
+                                    if (reversalInitList.size() > 0) {
+
+                                        reversalTransactionDate = reversalInitList.get(0).getTransactionDate() != null ? reversalInitList.get(0).getTransactionDate() : null;
+
+                                        String txnDateStr = reversalInitList.get(0).getTransactionDate() != null ? DateUtil.getFormatedDate(reversalInitList.get(0).getTransactionDate()) : "";
+                                        String resDateStr = reversalInitList.get(0).getResponseDate() != null ? DateUtil.getFormatedDate(reversalInitList.get(0).getResponseDate()) : "";
+
+                                        reversalInitData = new String[]{reversalInitList.get(0).getTerminalId(), reversalInitList.get(0).getMerchantId(), reversalInitList.get(0).getPosDeviceId(),
+                                                reversalInitList.get(0).getBatchNumber(), reversalInitList.get(0).getCardHolderName(), reversalInitList.get(0).getMaskedCardNumber(),
+                                                reversalInitList.get(0).getTransactionMode(), reversalInitList.get(0).getInvoiceNumber(), reversalInitList.get(0).getAcquireBank(),
+                                                reversalInitList.get(0).getCardType(), reversalInitList.get(0).getCardNetwork(), reversalInitList.get(0).getCardIssuerCountryCode(),
+                                                reversalInitList.get(0).getAmount(), reversalInitList.get(0).getResponseCode(), reversalInitList.get(0).getRrn(),
+                                                reversalInitList.get(0).getTransactionAuthCode(), txnDateStr, resDateStr,
+                                                reversalInitList.get(0).getTransactionId(), reversalInitList.get(0).getOrgTransactionId(), reversalInitList.get(0).getTransactionType(),
+                                                reversalInitList.get(0).getStatus(), reversalInitList.get(0).getStan(), reversalInitList.get(0).getSettlementMode(), reversalInitList.get(0).getSettlementStatus()};
+
+                                    }
+
+                                    Date saleTxnCutOffDate = saleTransactionDate != null ? DateUtil.stringToDate(DateUtil.parseDateFromDateTime(saleTransactionDate).concat(" 23:00:00")) : null;
+
+                                    String updatedSettlementStatus = "";
+                                    if (saleTransactionDate != null && saleTxnCutOffDate != null && saleTransactionDate.before(saleTxnCutOffDate) && (voidTransactionDate != null && voidTransactionDate.before(saleTxnCutOffDate) || (reversalTransactionDate != null && reversalTransactionDate.before(saleTxnCutOffDate)))) {
+                                        updatedSettlementStatus = "NotSettled";
+                                    } else if (saleInitData != null && saleHostData == null && saleAckData == null) {                 // Means only sale/UPI  INIT available
+                                        updatedSettlementStatus = "NotSettled";
+                                    } else if (saleHostData != null && saleHostData[13] != null && !saleHostData[13].equals("00")) {  // Means txn having host with not response code as not 00
+                                        updatedSettlementStatus = "NotSettled";
+                                    } else {
+                                        updatedSettlementStatus = "Settled";
+                                    }
+
+
+                                    //Below snippet for setting the Settlement Status and write into ATF File
+
+                                    if (saleAckData != null) {
+                                        saleAckData[24] = updatedSettlementStatus;
+                                        csvWriter.writeNext(saleAckData);
+                                        logger.info("Switch : Generated for txn -- {}", saleAckData[18]);
+                                    } else if (saleHostData != null) {
+                                        saleHostData[24] = updatedSettlementStatus;
+                                        csvWriter.writeNext(saleHostData);
+                                        logger.info("Switch : Generated for txn -- {}", saleHostData[18]);
+                                    } else if (saleInitData != null) {
+                                        saleInitData[24] = updatedSettlementStatus;
+                                        csvWriter.writeNext(saleInitData);
+                                        logger.info("Switch : Generated for txn -- {}", saleInitData[18]);
+                                    }
+
+                                    if (voidHostData != null) {
+                                        voidHostData[24] = updatedSettlementStatus;
+                                        csvWriter.writeNext(voidHostData);
+                                        logger.info("Switch : Generated for txn -- {}", voidHostData[18]);
+                                    } else if (voidInitData != null) {
+                                        voidInitData[24] = updatedSettlementStatus;
+                                        csvWriter.writeNext(voidInitData);
+                                        logger.info("Switch : Generated for txn -- {}", voidInitData[18]);
+                                    }
+
+                                    if (reversalInitData != null) {
+                                        reversalInitData[24] = updatedSettlementStatus;
+                                        csvWriter.writeNext(reversalInitData);
+                                        logger.info("Switch : Generated for txn -- {}", reversalInitData[18]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                excelFile.close();
+
+                logger.info("CSV File Generated Successfully----!!!");
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            } finally {
+                stmt.close();
+                con.close();
+                csvWriter.close();
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean generateAtfCSVResult(List<AtfFileDTO> atfFIleOut, String updatedAtfFile) {
+        logger.info("Creating CSV File ");
+        try {
+            //creating csv file
+            CSVWriter csvWriter = new CSVWriter(new FileWriter(updatedAtfFile, true), ',', CSVWriter.NO_QUOTE_CHARACTER);
+
+            List<String[]> finalOut = new ArrayList<>();
+            String[] out = null;
+
+            String[] header = {"terminalId", "merchantId", "posDeviceId", "batchNumber", "cardHolderName", "maskedCardNumber", "transactionMode", "invoiceNumber", "acquirerBank", "cardType", "cardNetwork", "cardIssuerCountryCode", "amount", "responseCode", "rrn", "transactionAuthCode",
+                    "transactionDate", "responseDate", "transactionId", "orgTransactionID", "transactionType", "status", "Stan", "settlementMode", "settlementStatus"};
+            csvWriter.writeNext(header);
+
+            for (AtfFileDTO obj : atfFIleOut) {       //writing data to sheet
+                String terminalId = String.valueOf(obj.getTerminalId());
+                String merchantId = String.valueOf(obj.getMerchantId());
+                String posDeviceId = String.valueOf(obj.getPosDeviceId());
+                String batchNumber = String.valueOf(obj.getBatchNumber());
+                String cardHolderName = String.valueOf(obj.getCardHolderName());
+                String maskedCardNumber = String.valueOf(obj.getMaskedCardNumber());
+                String transactionMode = String.valueOf(obj.getTransactionMode());
+                String invoiceNumber = String.valueOf(obj.getInvoiceNumber());
+                String acquirerBank = String.valueOf(obj.getAcquireBank());
+                String cardType = String.valueOf(obj.getCardType());
+                String cardNetwork = String.valueOf(obj.getCardNetwork());
+                String cardIssuerCountryCode = String.valueOf(obj.getCardIssuerCountryCode());
+                String amount = String.valueOf(obj.getAmount());
+                String responseCode = String.valueOf(obj.getResponseCode());
+                String rrn = String.valueOf(obj.getRrn());
+                String transactionAuthCode = String.valueOf(obj.getTransactionAuthCode());
+                String transactionDate = DateUtil.getFormatedDate(obj.getTransactionDate());
+                String responseDate = DateUtil.getFormatedDate(obj.getResponseDate());
+                String transactionId = String.valueOf(obj.getTransactionId());
+                String orgTransactionID = String.valueOf(obj.getOrgTransactionId());
+                String transactionType = String.valueOf(obj.getTransactionType());
+                String status = String.valueOf(obj.getStatus());
+                String Stan = String.valueOf(obj.getStan());
+                String settlementMode = String.valueOf(obj.getSettlementMode());
+                String settlementStatus = String.valueOf(obj.getSettlementStatus());
+
+
+                String[] data = {terminalId, merchantId, posDeviceId, batchNumber, cardHolderName, maskedCardNumber, transactionMode, invoiceNumber, acquirerBank, cardType, cardNetwork, cardIssuerCountryCode, amount, responseCode, rrn, transactionAuthCode, transactionDate, responseDate, transactionId, orgTransactionID,
+                        transactionType, status, Stan, settlementMode, settlementStatus};
+
+                csvWriter.writeNext(data);
+            }
+
+            csvWriter.close();
+            logger.info("CSV File Generated Successfully----!!!");
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
 }

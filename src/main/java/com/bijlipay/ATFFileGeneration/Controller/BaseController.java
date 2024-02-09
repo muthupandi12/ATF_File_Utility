@@ -24,4 +24,16 @@ public class BaseController {
     public Connection getConnection() throws SQLException {
         return DriverManager.getConnection(switchUrl, username, password);
     }
+
+
+    @Value("${spring.datasource.url}")
+    private String url;
+    @Value("${spring.datasource.username}")
+    private String username1;
+    @Value("${spring.datasource.password}")
+    private String password1;
+
+    public Connection getConnection1() throws SQLException {
+        return DriverManager.getConnection(url, username1, password1);
+    }
 }

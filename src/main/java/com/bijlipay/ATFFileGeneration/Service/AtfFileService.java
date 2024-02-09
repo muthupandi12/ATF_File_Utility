@@ -5,7 +5,9 @@ import com.bijlipay.ATFFileGeneration.Model.Dto.AxisDto;
 import com.nimbusds.jose.JOSEException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import com.bijlipay.ATFFileGeneration.Model.AtfFileDTO;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -95,6 +97,16 @@ public interface AtfFileService {
     void generateMissingRRNFromATF(String previousDate) throws ParseException, IOException;
 
     void validatedAtfFileReport(String date) throws IOException;
+
+
+    boolean updateNotificationDataIntoDb(String notificationFile) throws IOException, ParseException;
+
+    boolean updatedSwitchReqResDataIntoDb(String switchReqResFile);
+
+    boolean generateATFfile(MultipartFile file, String atfFile) throws IOException, SQLException;
+
+    boolean generateAtfCSVResult(List<AtfFileDTO> atfFileImports, String updatedAtfFile);
+
 }
 
 
