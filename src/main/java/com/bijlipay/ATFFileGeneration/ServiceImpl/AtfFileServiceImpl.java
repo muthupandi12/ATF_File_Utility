@@ -1967,6 +1967,7 @@ public class AtfFileServiceImpl implements AtfFileService {
     public boolean updateNotificationDataIntoDb(String notificationFile) throws IOException, ParseException {
         boolean updatedNotificationData = false;
         boolean updatedNotificationFields = false;
+        DataFormatter formatter = new DataFormatter();
 
         List<NotificationData> notificationDataList = new ArrayList<>();
         List<NotificationFields> notificationFieldsList = new ArrayList<>();
@@ -2043,7 +2044,8 @@ public class AtfFileServiceImpl implements AtfFileService {
                         }
 
                         NotificationFields notificationFields = new NotificationFields();
-                        notificationFields.setId((row.getCell(0) != null && !row.getCell(0).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? Long.parseLong(row.getCell(0).getStringCellValue().replaceAll("\u00a0", "").trim()) : null);
+
+                        notificationFields.setId((row.getCell(0) != null && !row.getCell(0).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? Long.parseLong(formatter.formatCellValue(row.getCell(0)).replaceAll("\u00a0", "").trim()) : null);
                         notificationFields.setRrn((row.getCell(1) != null && !row.getCell(1).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(1).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
                         notificationFields.setBatchNumber((row.getCell(2) != null && !row.getCell(2).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(2).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
                         notificationFields.setCardHolderName((row.getCell(3) != null && !row.getCell(3).toString().replaceAll("\u00a0", "").trim().equals("NULL")) ? row.getCell(3).getStringCellValue().replaceAll("\u00a0", "").trim() : "");
