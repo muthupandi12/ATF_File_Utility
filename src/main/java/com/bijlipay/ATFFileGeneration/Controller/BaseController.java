@@ -14,16 +14,16 @@ public class BaseController {
 
 
     private final Logger logger = LoggerFactory.getLogger(BaseController.class);
-    @Value("${switch.datasource.url}")
-    private String switchUrl;
-    @Value("${switch.datasource.username}")
-    private String username;
-    @Value("${switch.datasource.password}")
-    private String password;
+//    @Value("${switch.datasource.url}")
+//    private String switchUrl;
+//    @Value("${switch.datasource.username}")
+//    private String username;
+//    @Value("${switch.datasource.password}")
+//    private String password;
 
-    public Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(switchUrl, username, password);
-    }
+//    public Connection getConnection() throws SQLException {
+//        return DriverManager.getConnection(switchUrl, username, password);
+//    }
 
 
     @Value("${spring.datasource.url}")

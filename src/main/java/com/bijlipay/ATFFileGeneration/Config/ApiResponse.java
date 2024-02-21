@@ -10,15 +10,16 @@ public class ApiResponse {
 
     private Object message;
 
-    public ApiResponse(HttpStatus status, Object data, Object message) {
+    public ApiResponse(HttpStatus status, String message, Object data) {
         this.status = status;
-        this.data = data;
         this.message = message;
+        this.data = data;
+
     }
 
-    public ApiResponse(HttpStatus status, Object data) {
+    public ApiResponse(HttpStatus status, Object message) {
         this.status = status;
-        this.data = data;
+        this.message = message;
     }
 
     public HttpStatus getStatus() {

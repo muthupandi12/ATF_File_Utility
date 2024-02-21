@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -105,9 +106,9 @@ public class AtfFileController {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "success"), HttpStatus.OK);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
         } else {
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.BAD_REQUEST, "Please upload the correct files"), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -169,9 +170,9 @@ public class AtfFileController {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK,"Success"), HttpStatus.OK);
         } else {
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -201,7 +202,7 @@ public class AtfFileController {
             }
             return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
         } else {
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.BAD_REQUEST, "Please upload the correct files"), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -272,21 +273,21 @@ public class AtfFileController {
 //            download = atfFileService.downloadPhonePeFiles(currentDate);
 //            if (download) {
             logger.info("File Download Successfully");
-//            Boolean beforeCheck = atfFileService.beforeCheck();
-//            if (beforeCheck) {
-//                logger.info("Checking data present in before insert ");
-//            }
-//            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
-//            settlementFileUpdatedBefore = atfFileService.updatesettlementFileData(settlementFileBefore);
+            Boolean beforeCheck = atfFileService.beforeCheck();
+            if (beforeCheck) {
+                logger.info("Checking data present in before insert ");
+            }
+            allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+            settlementFileUpdatedBefore = atfFileService.updatesettlementFileData(settlementFileBefore);
 //            settlementFileUpdatedTwoDayBefore = atfFileService.updatesettlementFileData(settlementFileTwoDayBefore);
 //            txnListBefore = atfFileService.updateTxnListTotalData(missingTxnBefore);
 //            txnListAfter = atfFileService.updateTxnListTotalData(missingTxnAfter);
 //            if (txnListAfter && txnListBefore) {
 //                logger.info("Transaction List File Data inserted successfully");
 //            }
-//            if (allTxnFileUpdated && settlementFileUpdatedBefore && settlementFileUpdatedTwoDayBefore) {
-//                logger.info("ATF and Settlement Response File Data Inserted successfully ---");
-//            }
+            if (allTxnFileUpdated && settlementFileUpdatedBefore) {
+                logger.info("ATF and Settlement Response File Data Inserted successfully ---");
+            }
 //            }
 //            atfFileService.generateMissingRRNFromATF(previousDate);
             atfFileService.generateRefundFile(previousDate);
@@ -334,7 +335,7 @@ public class AtfFileController {
         boolean allTxnFileUpdated = false;
         String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
 
-//        String atfFile = atfFileReportPath + "ATF_Testing.csv";
+//        String atfFile = atfFileReportPath + "All_Txn_File-2024-02-12_Staged_49.csv";
 
         logger.info("Files -- ATF --{}", atfFile);
         try {
@@ -399,15 +400,40 @@ public class AtfFileController {
     }
 
 
-    @GetMapping("/generate-atf-for-transactions")
+    @PostMapping("/generate-atf-for-transactions")
     public ResponseEntity<?> uploadAtfFile(@RequestParam("file") MultipartFile file) {
 
         try {
-            String atfFileGenerated = updatedAtfFilePath + "All_Txn_File.csv";
+            Date currentDate = DateUtil.currentDate();
+            String currentDateTime = DateUtil.dateToStringForATF(currentDate);
+            String atfFileGenerated = updatedAtfFilePath + "All_Txn_File_"+currentDateTime+".csv";
             boolean result = atfFileService.generateATFfile(file, atfFileGenerated);
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success", result), HttpStatus.OK);
+            mailHandler.sendGeneratedATFToMail(currentDateTime);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
         } catch (Exception e) {
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success", e.getMessage()), HttpStatus.OK);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Success", e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @GetMapping("/find_large-file")
+    public ResponseEntity<?> findLargeFiles() throws Exception {
+        boolean download = false;
+        String currentDate = DateUtil.currentDateATF();
+        download = atfFileService.downloadLargeFile(currentDate);
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
+
+    @GetMapping("/process-file")
+    public ResponseEntity<?> processFile() throws Exception {
+        boolean allTxnFileUpdated = false;
+        String atfFile = atfFileReportPath + "ATF_Multiple_Testing.csv";
+        String currentDate = DateUtil.currentDateATF();
+        allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
+        List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransId(currentDate);
+        logger.info("Atf File All Rules Updated Successfully");
+        atfFileService.generateAtfFileReport(currentDate);
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
 }

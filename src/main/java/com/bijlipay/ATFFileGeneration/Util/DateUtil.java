@@ -65,6 +65,12 @@ public class DateUtil {
         return dateFormatter.format(date);
     }
 
+
+    public static String dateToStringForATF(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd_HH");
+        return dateFormatter.format(date);
+    }
+
     public static String dateToStringForMail(Date date) throws ParseException {
         SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd-HH");
         String unique = dateFormatter.format(date);
@@ -72,16 +78,16 @@ public class DateUtil {
         return total;
     }
 
-    public static String dateComparison(Date date) throws ParseException {
-        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM");
-        return dateFormatter.format(date);
-    }
-
-
 //    public static String dateComparison(Date date) throws ParseException {
-//        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy");
+//        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM");
 //        return dateFormatter.format(date);
 //    }
+
+
+    public static String dateComparison(Date date) throws ParseException {
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy");
+        return dateFormatter.format(date);
+    }
 
     public static String currentDate1() {
         Calendar cal = Calendar.getInstance();

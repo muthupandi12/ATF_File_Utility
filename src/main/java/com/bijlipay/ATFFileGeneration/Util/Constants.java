@@ -38,11 +38,11 @@ public class Constants {
 
 //    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","sarvesh@bijlipay.co.in","ramalingom.sundaram@bijlipay.co.in"};
 
-//    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in"};
+    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in"};
 
-    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","sarvesh@bijlipay.co.in","ramalingom.sundaram@bijlipay.co.in","monikandan@bijlipay.co.in"};
+//    public static final String[] SENT_TO = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","sarvesh@bijlipay.co.in","ramalingom.sundaram@bijlipay.co.in","monikandan@bijlipay.co.in","mohammedazaruddin.ba@bijlipay.co.in"};
 
-    public static final String[] SENT_VALIDATED_ATF = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","monikandan@bijlipay.co.in"};
+    public static final String[] SENT_VALIDATED_ATF = {"muthupandi@bijlipay.co.in","txn.support@bijlipay.co.in","rameshkumarm@bijlipay.co.in","madhusuthanan@bijlipay.co.in","monikandan@bijlipay.co.in","mohammedazaruddin.ba@bijlipay.co.in"};
 
     public static final String[] SENT_TO_PHONEPE_REPORTS = {"muthupandi@bijlipay.co.in"};
 

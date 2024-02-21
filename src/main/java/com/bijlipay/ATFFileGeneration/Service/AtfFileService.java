@@ -72,7 +72,6 @@ public interface AtfFileService {
 
     void executeQueryUpdation();
 
-    void processQueryExecution1(String filepath) throws IOException;
 
     void atfFileRulesCount(String date) throws IOException;
 
@@ -96,7 +95,7 @@ public interface AtfFileService {
 
     void generateMissingRRNFromATF(String previousDate) throws ParseException, IOException;
 
-    void validatedAtfFileReport(String date) throws IOException;
+    void validatedAtfFileReport(String date) throws IOException, ParseException;
 
 
     boolean updateNotificationDataIntoDb(String notificationFile) throws IOException, ParseException;
@@ -107,6 +106,9 @@ public interface AtfFileService {
 
     boolean generateAtfCSVResult(List<AtfFileDTO> atfFileImports, String updatedAtfFile);
 
+    boolean downloadLargeFile(String currentDate);
+
+//    void processMulipleData();
 }
 
 

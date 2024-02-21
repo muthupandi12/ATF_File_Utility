@@ -192,8 +192,8 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport, Long> {
     @Query(value = "select terminal_id,merchant_id,pos_device_id,batch_number,card_holder_name,masked_card_number,transaction_mode,invoice_number,acquire_bank,card_type,card_network,card_issuer_country_code,amount,response_code,rrn,transaction_auth_code,transaction_date,response_date,transaction_id,org_transaction_id,transaction_type,status,stan,settlement_mode,settlement_status from atf_file_report_main where transaction_date between ?1 and ?2 and response_code in ('00') and transaction_type ='Sale' and rrn not in (select p.rrn from phonepe_settlement_data p where p.status='00')",nativeQuery = true)
     List<Object[]> findByMissingATFDataBasedOnSettlementData(String minDate,String maxDate);
 
-    @Query(value = "select terminal_id,merchant_id,pos_device_id,batch_number,card_holder_name,masked_card_number,transaction_mode,invoice_number,acquire_bank,card_type,card_network,card_issuer_country_code,amount,response_code,rrn,transaction_auth_code,transaction_date,response_date,transaction_id,org_transaction_id,transaction_type,status,stan,settlement_mode,settlement_status from atf_file_report_main ",nativeQuery = true)
-    List<Object[]> findByFinalSettlementData();
+    @Query(value = "select terminal_id,merchant_id,pos_device_id,batch_number,card_holder_name,masked_card_number,transaction_mode,invoice_number,acquire_bank,card_type,card_network,card_issuer_country_code,amount,response_code,rrn,transaction_auth_code,transaction_date,response_date,transaction_id,org_transaction_id,transaction_type,status,stan,settlement_mode,settlement_status from atf_file_report_main where transaction_date between ?1 and ?2 and response_code in ('00') and transaction_type ='Sale'",nativeQuery = true)
+    List<Object[]> findByFinalSettlementData(String minDate,String maxDate);
 
     @Transactional
     @Modifying
@@ -208,6 +208,11 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport, Long> {
             "where transaction_type ='Reversal' and response_code ='00' \n" +
             "and settlement_status ='Settled' ",nativeQuery = true)
     List<String> findByRefundDataOnly();
+
+    @Query(value = "select distinct(a.transaction_id) from atf_file_report_main a where a.sale_upi_multiple_record =1",nativeQuery = true)
+    List<String> findByMultipleData();
+
+//    List<AtfFileReport> findByData();
 
 //    @Query(value = "select min(t.transaction_date), max(t.transaction_date) from atf_file_report_main t",nativeQuery = true)
 //    DateDto findByDatesFromATF();
