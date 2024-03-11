@@ -94,12 +94,12 @@ public class AtfFileServiceImpl implements AtfFileService {
     @Value("${atf.file.updated.path}")
     private String updatedAtfFilePath;
 
-    @Value("${switch.datasource.url}")
-    private String switchUrl;
-    @Value("${switch.datasource.username}")
-    private String username;
-    @Value("${switch.datasource.password}")
-    private String password;
+//    @Value("${switch.datasource.url}")
+//    private String switchUrl;
+//    @Value("${switch.datasource.username}")
+//    private String username;
+//    @Value("${switch.datasource.password}")
+//    private String password;
 
     @Value("${atf.datasource.url}")
     private String atfUrl;
@@ -115,8 +115,8 @@ public class AtfFileServiceImpl implements AtfFileService {
     @Value("${atf.check.password}")
     private String atfCheckPassword;
 
-    @Value("${atf.source.path.ip}")
-    private String atfSourcePathIP;
+    @Value("${atf.sftp.source.path}")
+    private String atfSftpSourcePath;
     private static final Logger logger = LoggerFactory.getLogger(AtfFileServiceImpl.class);
 
     @Override
@@ -1255,61 +1255,24 @@ public class AtfFileServiceImpl implements AtfFileService {
         return true;
     }
 
-    public Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(switchUrl, username, password);
-    }
+
 
     public Connection getCheckATFConnection() throws SQLException {
         return DriverManager.getConnection(atfCheckUrl, atfCheckUserName, atfCheckPassword);
     }
 
-    @Override
-    public void processQueryExecution(String filepath) throws IOException, SQLException {
-        BufferedReader reader = new BufferedReader(new FileReader(filepath));
-        reader.readLine().contains("Rule 1- SALE & UPI & VOID & Reversal ResponseDate lesser than transactionDate\n" +
-                "transactionId");
-        Stream<String> lines = reader.lines().skip(2);
-        List<String> transactionId = new ArrayList<>();
-        lines.forEachOrdered(line -> {
-            transactionId.add(line);
-        });
-        logger.info("Transaction Id List Size--{}", transactionId.size());
-        Connection con = null;
-        Statement stmt = null;
-        String txnId = transactionId.stream().collect(Collectors.joining("','", "'", "'"));
-        try {
-            con = getConnection();
-            stmt = con.createStatement();
-            String insertQuery = "INSERT INTO notification_data_Rev SELECT * FROM notification_data where OrgTransactionId IN (" + txnId + ")";
-            String deleteQuery = "delete FROM notification_data where OrgTransactionId IN (" + txnId + ")";
-            String updateQuery = "update notification_data set settlement_status='Settled' where transactionId IN(" + txnId + ") and NotificationType='ACK';";
-            int insert = stmt.executeUpdate(insertQuery);
-            logger.info("Reversal With ACK Data Insert SuccessFully --{}", insert);
-            int delete = stmt.executeUpdate(deleteQuery);
-            logger.info("Reversal With ACK Data Deleted SuccessFully --{}", delete);
-            int update = stmt.executeUpdate(updateQuery);
-            logger.info("Reversal With ACK Data Insert SuccessFully --{}", update);
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (con != null) {
-                con.close();
-            }
-        }
 
-    }
-
-    @Override
-    public void executeQueryUpdation() {
-        atfFileRepository.removeReversalEntries();
-        atfFileRepository.removeVoidEntries();
-        atfFileRepository.removeSaleWithInitEntries();
-        atfFileRepository.removeUPIWithInitEntries();
-        atfFileRepository.removeSaleAndHostNotInResponseCodeSuccess();
-        atfFileRepository.removeUPIAndHostNotInResponseCodeSuccess();
-        logger.info("All Queries are updated successfully---");
-    }
+//    @Override
+//    public void executeQueryUpdation() {
+//        atfFileRepository.removeReversalEntries();
+//        atfFileRepository.removeVoidEntries();
+//        atfFileRepository.removeSaleWithInitEntries();
+//        atfFileRepository.removeUPIWithInitEntries();
+//        atfFileRepository.removeSaleAndHostNotInResponseCodeSuccess();
+//        atfFileRepository.removeUPIAndHostNotInResponseCodeSuccess();
+//        logger.info("All Queries are updated successfully---");
+//    }
 
 
     @Override
@@ -1712,8 +1675,8 @@ public class AtfFileServiceImpl implements AtfFileService {
         boolean status = false;
         String currentDate = DateUtil.currentDateATF();
         String previousDate = DateUtil.previousDateATF();
-        String sourcePath = atfSourcePathIP + currentDate;
-        String sourcePath1 = atfSourcePathIP + previousDate;
+        String sourcePath = atfSftpSourcePath + currentDate;
+        String sourcePath1 = atfSftpSourcePath + previousDate;
         String destinationPath = updatedAtfFilePath;
 
 
@@ -2313,7 +2276,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     "                                    nd.response_code,nd.rrn,nd.transaction_auth_code,nd.transaction_date_time,nd.DateTime,nd.TransactionId,\n" +
                                     "                                    CASE WHEN nd.OrgTransactionId = '' THEN 'null'\n" +
                                     "                                    ELSE nd.OrgTransactionId END AS OrgTransactionId,\n" +
-                                    "                                    CASE WHEN nd.OrgTransactionId != '' and nd.TransactionType = 'UPI' THEN 'Reversal'\n" +
+                                    "                                    CASE WHEN nd.OrgTransactionId != 'null' and nd.TransactionType = 'UPI' THEN 'Reversal'\n" +
                                     "                                    ELSE nd.TransactionType END AS TransactionType ,nd.NotificationType as status,nd.Stan,'Auto' as settlement_mode,nd.settlement_status\n" +
                                     "                                    FROM notification_data nd\n" +
                                     "                                    left join notification_fields nf\n" +
@@ -2633,8 +2596,8 @@ public class AtfFileServiceImpl implements AtfFileService {
                                         "WHEN p.MTI = '0200' AND p.TXNTYPE = '00' THEN 'Sale'\n" +
                                         "WHEN p.MTI = '0200' AND p.TXNTYPE = '02' THEN 'Void'\n" +
                                         "WHEN ((p.MTI = '0400' AND p.TXNTYPE = '00') OR (p.MTI = '0100' AND p.TXNTYPE = '38')) THEN 'Reversal' END AS TransactionType,\n" +
-                                        "CASE WHEN p.MTI = '0210' THEN 'HOST'\n" +
-                                        "WHEN p.MTI = '0410' THEN 'INIT'\n" +
+                                        "CASE WHEN p.MTI = '0200' THEN 'HOST'\n" +
+                                        "WHEN p.MTI = '0400' THEN 'INIT'\n" +
                                         "WHEN p.MTI = '0100' AND (p.TXNTYPE = '36' OR p.TXNTYPE = '38') THEN 'INIT'\n" +
                                         "WHEN p.MTI = '0100' AND (p.TXNTYPE = '37' OR p.TXNTYPE = '39') THEN 'HOST'\n" +
                                         "WHEN p.MTI = '0300' AND p.TXNTYPE = '51' THEN 'ACK'\n" +

@@ -435,5 +435,4 @@ public class AtfFileController {
         atfFileService.generateAtfFileReport(currentDate);
         return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
     }
-
 }

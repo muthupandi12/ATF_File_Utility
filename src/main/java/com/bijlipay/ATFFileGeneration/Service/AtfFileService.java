@@ -68,9 +68,8 @@ public interface AtfFileService {
 
     Boolean removeATFFileRecord();
 
-    void processQueryExecution(String filepath) throws IOException, SQLException;
 
-    void executeQueryUpdation();
+//    void executeQueryUpdation();
 
 
     void atfFileRulesCount(String date) throws IOException;
