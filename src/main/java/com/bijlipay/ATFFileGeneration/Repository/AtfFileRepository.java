@@ -225,4 +225,20 @@ public interface AtfFileRepository extends JpaRepository<AtfFileReport, Long> {
 //    List<String> findByDataBasedOnRRN();
 
 
+//    @Query(value = "select count(*) from atf_file_report_main t where t.transaction_type in ('UPI') and t.transaction_date like '?1%'", nativeQuery = true)
+//    List<Object[]> findByUPITotalData(String date);
+//    @Query(value = "select count(*) from atf_file_report_main t where t.transaction_type in ('UPI') and t.transaction_date like '?1%'", nativeQuery = true)
+//    List<Object[]> findByUPISettledData(String date1,String date2);
+//    @Query(value = "select count(*) from atf_file_report_main t where t.transaction_type in ('UPI') and t.transaction_date like '?1%'", nativeQuery = true)
+//    List<Object[]> findByUPINotSettledData(String date1,String date2);
+
+
+    @Query(value = "select count(*) from atf_file_report_main t where t.transaction_type in ('UPI') and t.transaction_date like '?1%'", nativeQuery = true)
+    String findByUPITotalData(String date);
+    @Query(value = "select count(*) from atf_file_report_main t where t.transaction_type in ('UPI') and t.transaction_date between ?1 and ?2 and t.settlement_status ='Settled'", nativeQuery = true)
+    String findByUPISettledData(String date1,String date2);
+    @Query(value = "select count(*) from atf_file_report_main t where t.transaction_type in ('UPI') and t.transaction_date between ?1 and ?2 and t.settlement_status ='NotSettled'", nativeQuery = true)
+    String findByUPINotSettledData(String date1,String date2);
+
+
 }

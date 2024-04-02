@@ -1,14 +1,14 @@
 package com.bijlipay.ATFFileGeneration.Util;
 
+import com.bijlipay.ATFFileGeneration.Model.Dto.UPICountDto;
 import com.opencsv.CSVWriter;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.text.ParseException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -295,5 +295,46 @@ public class ReportUtil {
                 .map(key -> key + "=" + map.get(key))
                 .collect(Collectors.joining(", ", "{", "}"));
         return mapAsString;
+    }
+
+    private static Sheet prepColumnNames(String sheetName, List<String> columns, SXSSFWorkbook workBook) {
+        Sheet sheet = workBook.createSheet(sheetName);
+        Font headerFont = workBook.createFont();
+        headerFont.setBold(true);
+        headerFont.setColor(IndexedColors.BLACK.getIndex());
+        CellStyle cellStyle = workBook.createCellStyle();
+        cellStyle.setFont(headerFont);
+        Row headerRow = sheet.createRow(0);
+        for (int col = 0; col < columns.size(); col++) {
+            Cell cell = headerRow.createCell(col);
+            cell.setCellValue(columns.get(col));
+            cell.setCellStyle(cellStyle);
+        }
+        return sheet;
+    }
+    private static SXSSFWorkbook prepSSFBook() {
+        SXSSFWorkbook wb = new SXSSFWorkbook(100); // turn off auto-flushing and accumulate all rows in memory
+        wb.setCompressTempFiles(true);
+        return wb;
+    }
+    public static SXSSFWorkbook upiCountExcel(List<UPICountDto> upiCountDtos, List<String> headers, String sheetName, File file) throws IOException {
+        FileOutputStream fileOut = null;
+
+        SXSSFWorkbook wb = prepSSFBook();
+        Sheet sh = prepColumnNames(sheetName, headers, wb);
+        Integer rowCount = upiCountDtos.size();
+        int startRow = 1;
+        logger.info("The total size of the UPI Count details : -- : {}", rowCount);
+        for (UPICountDto upiCountDto : upiCountDtos) {
+            Row shRow = sh.createRow(startRow++);
+            List<String> rowAsString = upiCountDto.getAsList();
+            for (int cellnum = 0; cellnum < rowAsString.size(); cellnum++) {
+                shRow.createCell(cellnum).setCellValue(rowAsString.get(cellnum));
+            }
+        }
+        fileOut = new FileOutputStream(file);
+        wb.write(fileOut);
+        fileOut.close();
+        return wb;
     }
 }

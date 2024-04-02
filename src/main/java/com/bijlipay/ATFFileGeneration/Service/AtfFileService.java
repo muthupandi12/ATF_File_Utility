@@ -107,6 +107,10 @@ public interface AtfFileService {
 
     boolean downloadLargeFile(String currentDate);
 
+    void insertDataFromFile(String file);
+
+    void generateATFUPITxnCountData(String date) throws ParseException, IOException;
+
 //    void processMulipleData();
 }
 

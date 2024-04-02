@@ -36,8 +36,9 @@ public class MailHandler {
                     "Bijlipay\n\n Note :" +
                     "This is an auto generated email. Please do not respond to this email id.\n For any queries You can call us @ 1800 4200 235 or" +
                     " write to us @ service@bijlipay.co.in."));
+            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "ATF_UPI_Txn_Count_Report-" + date + ".xlsx");
 
-            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "ATF_Rules_Executed_Report-" + date + ".txt");
+//            FileSystemResource file1 = new FileSystemResource(atfFileUpdatedPath + "ATF_Rules_Executed_Report-" + date + ".txt");
             helper.addAttachment(file1.getFilename(), file1);
             sender.send(message);
         } catch (MessagingException e) {

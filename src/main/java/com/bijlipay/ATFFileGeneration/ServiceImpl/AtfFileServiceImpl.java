@@ -3,10 +3,12 @@ package com.bijlipay.ATFFileGeneration.ServiceImpl;
 import com.bijlipay.ATFFileGeneration.Model.*;
 import com.bijlipay.ATFFileGeneration.Model.Dto.AxisDto;
 import com.bijlipay.ATFFileGeneration.Model.Dto.DateDto;
+import com.bijlipay.ATFFileGeneration.Model.Dto.UPICountDto;
 import com.bijlipay.ATFFileGeneration.Repository.*;
 import com.bijlipay.ATFFileGeneration.Service.AtfFileService;
 import com.bijlipay.ATFFileGeneration.Util.*;
 import com.bijlipay.ATFFileGeneration.Util.DateUtil;
+import com.google.gson.Gson;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
@@ -29,10 +31,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.net.ssl.*;
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.channels.Channel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,15 +38,13 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
 import java.sql.*;
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Date;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.bijlipay.ATFFileGeneration.Util.Constants.*;
+import static com.sun.org.apache.xml.internal.security.keys.keyresolver.KeyResolver.length;
 
 @Service
 public class AtfFileServiceImpl implements AtfFileService {
@@ -90,6 +86,9 @@ public class AtfFileServiceImpl implements AtfFileService {
 
     @Autowired
     private PhonePeSettlementDataRepository phonePeSettlementDataRepository;
+
+    @Autowired
+    private ATFFileDataRepository atfFileDataRepository;
 
     @Value("${atf.file.updated.path}")
     private String updatedAtfFilePath;
@@ -748,7 +747,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                         String index[] = requestDate.split("-");
 //                                        logger.info("index1 {}----index2 {}",index[0],index[1]);
 //                                        out = index[0] + "-" + index[1];
-                                        out = index[0] ;
+                                        out = index[0];
 //                                        logger.info("finalDate --{}",out);
                                     } catch (ParseException e) {
                                         throw new RuntimeException(e);
@@ -1256,11 +1255,9 @@ public class AtfFileServiceImpl implements AtfFileService {
     }
 
 
-
     public Connection getCheckATFConnection() throws SQLException {
         return DriverManager.getConnection(atfCheckUrl, atfCheckUserName, atfCheckPassword);
     }
-
 
 
 //    @Override
@@ -1518,7 +1515,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 
         List<Object[]> atfMissingDataOut = atfFileRepository.findByMissingATFDataBasedOnSettlementData(date1, date2);
         List<Object[]> settlementMissingDataOut = phonePeSettlementDataRepository.findByMissingSettlementDataBasedOnATFData(date1, date2);
-        List<Object[]> settlementDataOut = atfFileRepository.findByFinalSettlementData(date1,date2);
+        List<Object[]> settlementDataOut = atfFileRepository.findByFinalSettlementData(date1, date2);
 
         if (!atfMissingDataFile.exists()) {
             logger.info("ATF File Missing data size --{}", atfMissingDataOut.size());
@@ -1773,7 +1770,7 @@ public class AtfFileServiceImpl implements AtfFileService {
     public void validatedAtfFileReport(String date) throws IOException, ParseException {
         Date currentDate = DateUtil.currentDate();
         String currentDateTime = DateUtil.dateToStringForATF(currentDate);
-        String updatedAtfFile = updatedAtfFilePath + "Validated_ATF_Report"+date+".txt";
+        String updatedAtfFile = updatedAtfFilePath + "Validated_ATF_Report" + date + ".txt";
         String atfFileSheet = "Validated_ATF_Report-" + currentDateTime + ".txt";
         List<Object[]> atf = null;
         for (int i = 0; i < 20; i++) {
@@ -2247,7 +2244,7 @@ public class AtfFileServiceImpl implements AtfFileService {
             fileExtension = file.getOriginalFilename().substring(index + 1);
         }
         if (fileExtension.equals("xlsx")) {
-        logger.info("inside excel file");
+            logger.info("inside excel file");
             try {
                 FileInputStream excelFile = new FileInputStream(new File(filepath));
                 Workbook workbook = new XSSFWorkbook(excelFile);
@@ -2264,7 +2261,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                         if (cell.getColumnIndex() == 0 && cell.getCellTypeEnum() != CellType.BLANK) {
                             DataFormatter formatter = new DataFormatter();
                             String rrnOrtxn = formatter.formatCellValue(sheet.getRow(row.getRowNum()).getCell(cell.getColumnIndex())).replaceAll("\u00a0", "").trim();
-                            logger.info("RRN or Transaction Id  ---{}",rrnOrtxn);
+                            logger.info("RRN or Transaction Id  ---{}", rrnOrtxn);
 
                            /* Query to fetch ATF from notification Data and Notification Field
                             When notification data table has notification field id as 0 (happens in rare case), to map to nofication field table,
@@ -2281,9 +2278,9 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     "                                    FROM notification_data nd\n" +
                                     "                                    left join notification_fields nf\n" +
                                     "                                    on  nd.notification_fields_id = nf.Id\n" +
-                                    "                                          where nd.rrn ='"+rrnOrtxn+"' or nd.TransactionId ='"+rrnOrtxn+"';";
+                                    "                                          where nd.rrn ='" + rrnOrtxn + "' or nd.TransactionId ='" + rrnOrtxn + "';";
 
-                            logger.info("Notification Query ----{}",notificationQuery);
+                            logger.info("Notification Query ----{}", notificationQuery);
                             ResultSet notificationRS = stmt.executeQuery(notificationQuery);
 
                             List<AtfFileDTO> atfFileDTOFromNotificationList = new ArrayList<>();
@@ -2319,7 +2316,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 
                                 String responseDateTime = notificationRS.getString("DateTime");
                                 //if(!responseDateTime.isEmpty()){
-                                    Date resDate = DateUtil.stringToDate(responseDateTime);
+                                Date resDate = DateUtil.stringToDate(responseDateTime);
                                 atfFileNotificationDTO.setResponseDate(resDate);
                                 //}
                                 //else {
@@ -2606,7 +2603,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                         "FROM phonepe_transaction p where p.RRNumber ='" + rrnOrtxn + "' or REPLACE(REPLACE(REPLACE(replace( CONCAT (p.TerminalId ,CONVERT (varchar,p.ResponseReceivedTime,23)),'-',''),':',''),'.',''),' ','') = '" + rrnOrtxn + "' " +
                                         "or p.InvoiceNumber = '" + rrnOrtxn + "';";
 
-                                logger.info("Switch Query ---{}",switchReqResQuery);
+                                logger.info("Switch Query ---{}", switchReqResQuery);
                                 ResultSet switchReqResRS = stmt.executeQuery(switchReqResQuery);
 
                                 List<AtfFileDTO> atfFileDTOFromSwitchList = new ArrayList<>();
@@ -2660,7 +2657,7 @@ public class AtfFileServiceImpl implements AtfFileService {
                                     atfFileDTOFromSwitchList.add(atfFileFromSwitchDTO);
 
                                 }
-                                logger.info("Switch Txn size ---{}",atfFileDTOFromSwitchList.size());
+                                logger.info("Switch Txn size ---{}", atfFileDTOFromSwitchList.size());
 
                                 if (atfFileDTOFromSwitchList.size() > 0) {
 
@@ -3062,6 +3059,262 @@ public class AtfFileServiceImpl implements AtfFileService {
         }
         return status;
     }
+
+    @Override
+    public void insertDataFromFile(String filepath) {
+
+        try {
+            String fileLocation = "E:\\Txn_03_00.log";
+            File file = new File(fileLocation);
+            FileReader fr = new FileReader(file);
+            BufferedReader br = new BufferedReader(fr);
+            boolean mti = false;
+            boolean pincode = false;
+            boolean amount = false;
+            boolean stan = false;
+            boolean tid = false;
+            boolean mid = false;
+            boolean invoice = false;
+            List<String> allLines = Files.readAllLines(Paths.get(filepath));
+            List<ATFFileData> data = new ArrayList<>();
+//            ATFFileData fileData = new ATFFileData();
+            Gson gson = new Gson();
+            ATFFileData fileData = null;
+            int count = 0;
+            fileData = new ATFFileData();
+            for (String line : allLines) {
+                if (line.contains("< MTI > 0100")) {
+                    fileData.setMti(line.substring(line.lastIndexOf("< MTI >") + 7, line.length()));
+                }
+                if (line.contains("< 3 > ")) {
+                    logger.info("inside 3 tag");
+                    fileData.setPincode(line.substring(line.lastIndexOf("< 3 > ") + 5, line.length()));
+                }
+                if (line.contains("< 4 > ")) {
+                    logger.info("inside 4 tag");
+                    fileData.setAmount(line.substring(line.lastIndexOf("< 4 > ") + 5, line.length()));
+                }
+                if (line.contains("< 11 > ")) {
+                    logger.info("inside 11 tag");
+                    fileData.setStan(line.substring(line.lastIndexOf("< 11 > ") + 6, line.length()));
+                }
+                if (line.contains("< 41 > ")) {
+                    logger.info("inside 41 tag");
+                    fileData.setTid(line.substring(line.lastIndexOf("< 41 > ") + 6, line.length()));
+                }
+                if (line.contains("< 42 > ")) {
+                    logger.info("inside 42 tag");
+                    fileData.setMid(line.substring(line.lastIndexOf("< 42 > ") + 6, line.length()));
+                }
+                if (line.contains("< 56 > ")) {
+                    logger.info("inside 56 tag");
+                    fileData.setInvoiceNumber(line.substring(line.lastIndexOf("< 56 > ") + 6, line.length()));
+                }
+                if (line.contains("< 62 > ")) {
+                    fileData.setBatchNumber(line.substring(line.lastIndexOf("< 62 > ") + 6, line.length()));
+                }
+
+//                    count++;
+                logger.info("File Data ---{}", gson.toJson(fileData));
+                if (fileData != null) {
+                    data.add(fileData);
+                }
+
+                if (line.contains("< MTI > 0200")) {
+                    fileData.setMti(line.substring(line.lastIndexOf("< MTI >") + 7, line.length()));
+                }
+                if (line.contains("< 3 > ")) {
+                    fileData.setPincode(line.substring(line.lastIndexOf("< 3 > ") + 5, line.length()));
+                }
+                if (line.contains("< 4 > ")) {
+                    fileData.setAmount(line.substring(line.lastIndexOf("< 4 > ") + 5, line.length()));
+                }
+                if (line.contains("< 11 > ")) {
+                    fileData.setStan(line.substring(line.lastIndexOf("< 11 > ") + 6, line.length()));
+                }
+                if (line.contains("< 41 > ")) {
+                    fileData.setTid(line.substring(line.lastIndexOf("< 41 > ") + 6, line.length()));
+                }
+                if (line.contains("< 42 > ")) {
+                    fileData.setMid(line.substring(line.lastIndexOf("< 42 > ") + 6, line.length()));
+                }
+                if (line.contains("< 56 > ")) {
+                    fileData.setInvoiceNumber(line.substring(line.lastIndexOf("< 56 > ") + 6, line.length()));
+                }
+                if (line.contains("< 62 > ")) {
+                    fileData.setBatchNumber(line.substring(line.lastIndexOf("< 62 > ") + 6, line.length()));
+                }
+                logger.info("File Data ---{}", gson.toJson(fileData));
+                if (fileData != null) {
+                    data.add(fileData);
+                }
+
+                count++;
+//                mti = true;
+            }
+            if (data != null) {
+                atfFileDataRepository.saveAll(data);
+            }
+            br.close();
+            fr.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void generateATFUPITxnCountData(String date) throws ParseException, IOException {
+        String updatedAtfFile = updatedAtfFilePath + "ATF_UPI_Txn_Count_Report-" + date + ".xlsx";
+        String atfFileSheet = "ATF_UPI_Txn_Count_Report-" + date + ".xlsx";
+
+        String time10AM = date + " 10:00:00";
+        String time11AM = date + " 11:00:00";
+        String time12PM = date + " 12:00:00";
+        String time1PM = date + " 13:00:00";
+        String time2PM = date + " 14:00:00";
+        String time3PM = date + " 15:00:00";
+        String time4PM = date + " 16:00:00";
+        String time5PM = date + " 17:00:00";
+        String time6PM = date + " 18:00:00";
+        String time7PM = date + " 19:00:00";
+        String time8PM = date + " 20:00:00";
+
+        String time10AM1 = date + " 10:59:59";
+        String time11AM1 = date + " 11:59:59";
+        String time12PM1 = date + " 12:59:59";
+        String time1PM1 = date + " 13:59:59";
+        String time2PM1 = date + " 14:59:59";
+        String time3PM1 = date + " 15:59:59";
+        String time4PM1 = date + " 16:59:59";
+        String time5PM1 = date + " 17:59:59";
+        String time6PM1 = date + " 18:59:59";
+        String time7PM1 = date + " 19:59:59";
+        String time8PM1 = date + " 20:59:59";
+
+        List<UPICountDto> countDtoList = new ArrayList<>();
+
+        List<Object[]> atf = null;
+//        for (int i = 0; i < 23; i++) {
+            String[] addressesArr = new String[1];
+//            if (i == 0) {
+//                addressesArr[0] = "UPI Txn Total Count";
+//                atf = atfFileRepository.findByUPITotalData(date);
+//            } else if (i == 1) {
+//                addressesArr[0] = "UPI Settled Txn Count 10 AM - 11 AM";
+//                atf = atfFileRepository.findByUPISettledData(time10AM, time10AM1);
+//            } else if (i == 2) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 10 AM - 11 AM";
+//                atf = atfFileRepository.findByUPINotSettledData(time10AM, time10AM1);
+//            } else if (i == 3) {
+//                addressesArr[0] = "UPI Settled Txn Count 11 AM - 12 AM";
+//                atf = atfFileRepository.findByUPISettledData(time11AM, time11AM1);
+//            } else if (i == 4) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 11 AM - 12 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time11AM, time11AM1);
+//            } else if (i == 5) {
+//                addressesArr[0] = "UPI Settled Txn Count 12 PM - 1 PM";
+//                atf = atfFileRepository.findByUPISettledData(time12PM, time12PM1);
+//            } else if (i == 6) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 12 PM - 1 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time12PM, time12PM1);
+//            } else if (i == 7) {
+//                addressesArr[0] = "UPI Settled Txn Count 1 PM - 2 PM";
+//                atf = atfFileRepository.findByUPISettledData(time1PM, time1PM1);
+//            } else if (i == 8) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 1 PM - 2 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time1PM, time1PM1);
+//            } else if (i == 9) {
+//                addressesArr[0] = "UPI Settled Txn Count 2 PM - 3 PM";
+//                atf = atfFileRepository.findByUPISettledData(time2PM, time2PM1);
+//            } else if (i == 10) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 2 PM - 3 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time2PM, time2PM1);
+//            } else if (i == 11) {
+//                addressesArr[0] = "UPI Settled Txn Count 3 PM - 4 PM";
+//                atf = atfFileRepository.findByUPISettledData(time3PM, time3PM1);
+//            } else if (i == 12) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 3 PM - 4 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time3PM, time3PM1);
+//            } else if (i == 13) {
+//                addressesArr[0] = "UPI Settled Txn Count 4 PM - 5 PM";
+//                atf = atfFileRepository.findByUPISettledData(time4PM, time4PM1);
+//            } else if (i == 14) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 4 PM - 5 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time4PM, time4PM1);
+//            } else if (i == 15) {
+//                addressesArr[0] = "UPI Settled Txn Count 5 PM - 6 PM";
+//                atf = atfFileRepository.findByUPISettledData(time5PM, time5PM1);
+//            } else if (i == 16) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 5 PM - 6 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time5PM, time5PM1);
+//            } else if (i == 17) {
+//                addressesArr[0] = "UPI Settled Txn Count 6 PM - 7 PM";
+//                atf = atfFileRepository.findByUPISettledData(time6PM, time6PM1);
+//            } else if (i == 18) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 6 PM - 7 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time6PM, time6PM1);
+//            } else if (i == 19) {
+//                addressesArr[0] = "UPI Settled Txn Count 7 PM - 8 PM";
+//                atf = atfFileRepository.findByUPISettledData(time7PM, time7PM1);
+//            } else if (i == 20) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 7 PM - 8 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time7PM, time7PM1);
+//            } else if (i == 21) {
+//                addressesArr[0] = "UPI Settled Txn Count 8 PM - 9 PM";
+//                atf = atfFileRepository.findByUPISettledData(time8PM, time8PM1);
+//            } else if (i == 22) {
+//                addressesArr[0] = "UPI UnSettled Txn Count 8 PM - 9 PM";
+//                atf = atfFileRepository.findByUPINotSettledData(time8PM, time8PM1);
+//            }
+
+
+            UPICountDto countDto1 = new UPICountDto();
+
+            countDto1.setStatus("UPI  Txn Count 10 AM - 11 AM");
+            countDto1.setSettled(atfFileRepository.findByUPISettledData(time10AM, time10AM1));
+            countDto1.setNotSettled(atfFileRepository.findByUPINotSettledData(time10AM, time10AM1));
+            countDtoList.add(countDto1);
+            UPICountDto countDto2 = new UPICountDto();
+
+            countDto2.setStatus("UPI  Txn Count 11 AM - 12 AM");
+            countDto2.setSettled(atfFileRepository.findByUPISettledData(time11AM, time11AM1));
+            countDto2.setNotSettled(atfFileRepository.findByUPINotSettledData(time11AM, time11AM1));
+            countDtoList.add(countDto2);
+            UPICountDto countDto3 = new UPICountDto();
+
+            countDto3.setStatus("UPI  Txn Count 12 PM - 1 PM");
+            countDto3.setSettled(atfFileRepository.findByUPISettledData(time12PM, time12PM1));
+            countDto3.setNotSettled(atfFileRepository.findByUPINotSettledData(time12PM, time12PM1));
+            countDtoList.add(countDto3);
+
+            UPICountDto countDto4 = new UPICountDto();
+            countDto4.setStatus("UPI  Txn Count 1 PM - 2 PM");
+            countDto4.setSettled(atfFileRepository.findByUPISettledData(time1PM, time1PM1));
+            countDto4.setNotSettled(atfFileRepository.findByUPINotSettledData(time1PM, time1PM1));
+            countDtoList.add(countDto4);
+
+            UPICountDto countDto5 = new UPICountDto();
+            countDto5.setStatus("UPI  Txn Count 2 PM - 3 PM");
+            countDto5.setSettled(atfFileRepository.findByUPISettledData(time2PM, time2PM1));
+            countDto5.setNotSettled(atfFileRepository.findByUPINotSettledData(time2PM, time2PM1));
+            countDtoList.add(countDto5);
+
+            UPICountDto countDto6 = new UPICountDto();
+            countDto6.setStatus("UPI  Txn Count 3 PM - 4 PM");
+            countDto6.setSettled(atfFileRepository.findByUPISettledData(time3PM, time3PM1));
+            countDto6.setNotSettled(atfFileRepository.findByUPINotSettledData(time3PM, time3PM1));
+            countDtoList.add(countDto6);
+
+//        ReportUtil.generateAtfFileReportInTextFile(atf, Constants.COUNT, updatedAtfFile, atfFileSheet, addressesArr);
+
+
+
+//        }
+        List<String> headers = Arrays.asList("Status", "Settled","NotSettled");
+        File file = new File(updatedAtfFile);
+        ReportUtil.upiCountExcel(countDtoList, headers, atfFileSheet,file);
+
+}
 
 //    @Override
 //    public void processMulipleData() {

@@ -21,6 +21,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -95,6 +98,7 @@ public class AtfFileController {
 
                 atfFileService.generateAtfFileReport(date);
                 atfFileService.generateMissingATFFileTxn(date);
+                atfFileService.generateATFUPITxnCountData(date);
                 Boolean remove = atfFileService.removeDataInDB();
                 if (remove) {
                     logger.info("Remove Data in DB Successfully");
@@ -170,7 +174,7 @@ public class AtfFileController {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK,"Success"), HttpStatus.OK);
+            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
         } else {
             return new ResponseEntity<>(new ApiResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Please upload the correct files"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -182,28 +186,30 @@ public class AtfFileController {
         String atfFile = atfFileReportPath + "All_Txn_File-" + date + ".csv";
         File atf = new File(atfFile);
         boolean allTxnFileUpdated = false;
-        if (atf.exists()) {
+//        if (atf.exists()) {
             try {
-                allTxnFileUpdated = atfFileService.updateDataIntoDb(atfFile);
-                if (allTxnFileUpdated) {
-                    logger.info("ATF File Data inserted Successfully ----");
-                }
-                List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransIdReversalOnly();
-                atfFileService.generateAtfFileReportForReversalEntry(date);
-                Boolean remove = atfFileService.removeATFFileRecord();
-                if (remove) {
-                    logger.info("ATF File Data Removed Successfully ---");
-                }
-                mailHandler.sendReversalMail(date);
-                logger.info("Reversal Data Mail send Successfully ---");
-//                atfFileService.removeFile(date);
+
+
+//
+//                atfFileService.generateATFUPITxnCountData(date);
+
+//                List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransIdReversalOnly();
+//                atfFileService.generateAtfFileReportForReversalEntry(date);
+//                Boolean remove = atfFileService.removeATFFileRecord();
+//                if (remove) {
+//                    logger.info("ATF File Data Removed Successfully ---");
+//                }
+//                mailHandler.sendReversalMail(date);
+                mailHandler.sendATFRuleDataMail(date);
+//                logger.info("Reversal Data Mail send Successfully ---");
+////                atfFileService.removeFile(date);
             } catch (Exception e) {
                 e.printStackTrace();
             }
             return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.BAD_REQUEST, "Please upload the correct files"), HttpStatus.BAD_REQUEST);
-        }
+//        } else {
+//            return new ResponseEntity<>(new ApiResponse(HttpStatus.BAD_REQUEST, "Please upload the correct files"), HttpStatus.BAD_REQUEST);
+//        }
     }
 
     @GetMapping("/get-atf-rules-count/{date}")
@@ -406,7 +412,7 @@ public class AtfFileController {
         try {
             Date currentDate = DateUtil.currentDate();
             String currentDateTime = DateUtil.dateToStringForATF(currentDate);
-            String atfFileGenerated = updatedAtfFilePath + "All_Txn_File_"+currentDateTime+".csv";
+            String atfFileGenerated = updatedAtfFilePath + "All_Txn_File_" + currentDateTime + ".csv";
             boolean result = atfFileService.generateATFfile(file, atfFileGenerated);
             mailHandler.sendGeneratedATFToMail(currentDateTime);
             return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
@@ -433,6 +439,25 @@ public class AtfFileController {
         List<AtfFileReport> atfFileReports = atfFileService.updateDataBasedOnTransId(currentDate);
         logger.info("Atf File All Rules Updated Successfully");
         atfFileService.generateAtfFileReport(currentDate);
+
         return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
     }
+
+    @PostMapping("/insert-txn-data-from-file")
+    public ResponseEntity<?> insertData(@RequestParam("file") MultipartFile file) throws Exception {
+        String uploadDir = "/tmp/";
+        File fh = new File("/tmp/");
+        if (!fh.exists()) {
+            fh.mkdir();
+        }
+        // Get the file and save it somewhere
+        byte[] bytes = file.getBytes();
+        final String filepath = uploadDir + file.getOriginalFilename();
+        Path path = Paths.get(uploadDir + file.getOriginalFilename());
+        Files.write(path, bytes);
+        atfFileService.insertDataFromFile(filepath);
+
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
 }
