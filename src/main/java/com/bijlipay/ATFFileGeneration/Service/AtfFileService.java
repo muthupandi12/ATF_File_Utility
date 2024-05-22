@@ -2,6 +2,7 @@ package com.bijlipay.ATFFileGeneration.Service;
 
 import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
 import com.bijlipay.ATFFileGeneration.Model.Dto.AxisDto;
+import com.itextpdf.text.DocumentException;
 import com.nimbusds.jose.JOSEException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +10,7 @@ import com.bijlipay.ATFFileGeneration.Model.AtfFileDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -110,6 +112,9 @@ public interface AtfFileService {
     void insertDataFromFile(String file);
 
     void generateATFUPITxnCountData(String date) throws ParseException, IOException;
+
+
+    ByteArrayOutputStream generatePdfFile() throws DocumentException, IOException;
 
 //    void processMulipleData();
 }

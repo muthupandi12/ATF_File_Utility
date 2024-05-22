@@ -9,6 +9,12 @@ import com.bijlipay.ATFFileGeneration.Service.AtfFileService;
 import com.bijlipay.ATFFileGeneration.Util.*;
 import com.bijlipay.ATFFileGeneration.Util.DateUtil;
 import com.google.gson.Gson;
+import com.itextpdf.text.*;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.pdf.FontSelector;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
@@ -30,6 +36,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.net.ssl.*;
+import javax.swing.text.StyledEditorKit;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +48,7 @@ import java.sql.*;
 import java.text.ParseException;
 import java.util.*;
 import java.util.Date;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.bijlipay.ATFFileGeneration.Util.Constants.*;
@@ -3195,7 +3203,7 @@ public class AtfFileServiceImpl implements AtfFileService {
 
         List<Object[]> atf = null;
 //        for (int i = 0; i < 23; i++) {
-            String[] addressesArr = new String[1];
+        String[] addressesArr = new String[1];
 //            if (i == 0) {
 //                addressesArr[0] = "UPI Txn Total Count";
 //                atf = atfFileRepository.findByUPITotalData(date);
@@ -3268,63 +3276,169 @@ public class AtfFileServiceImpl implements AtfFileService {
 //            }
 
 
-            UPICountDto countDto1 = new UPICountDto();
+        UPICountDto countDto1 = new UPICountDto();
 
-            countDto1.setStatus("UPI  Txn Count 10 AM - 11 AM");
-            countDto1.setSettled(atfFileRepository.findByUPISettledData(time10AM, time10AM1));
-            countDto1.setNotSettled(atfFileRepository.findByUPINotSettledData(time10AM, time10AM1));
-            countDtoList.add(countDto1);
-            UPICountDto countDto2 = new UPICountDto();
+        countDto1.setStatus("UPI  Txn Count 10 AM - 11 AM");
+        countDto1.setSettled(atfFileRepository.findByUPISettledData(time10AM, time10AM1));
+        countDto1.setNotSettled(atfFileRepository.findByUPINotSettledData(time10AM, time10AM1));
+        countDtoList.add(countDto1);
+        UPICountDto countDto2 = new UPICountDto();
 
-            countDto2.setStatus("UPI  Txn Count 11 AM - 12 AM");
-            countDto2.setSettled(atfFileRepository.findByUPISettledData(time11AM, time11AM1));
-            countDto2.setNotSettled(atfFileRepository.findByUPINotSettledData(time11AM, time11AM1));
-            countDtoList.add(countDto2);
-            UPICountDto countDto3 = new UPICountDto();
+        countDto2.setStatus("UPI  Txn Count 11 AM - 12 AM");
+        countDto2.setSettled(atfFileRepository.findByUPISettledData(time11AM, time11AM1));
+        countDto2.setNotSettled(atfFileRepository.findByUPINotSettledData(time11AM, time11AM1));
+        countDtoList.add(countDto2);
+        UPICountDto countDto3 = new UPICountDto();
 
-            countDto3.setStatus("UPI  Txn Count 12 PM - 1 PM");
-            countDto3.setSettled(atfFileRepository.findByUPISettledData(time12PM, time12PM1));
-            countDto3.setNotSettled(atfFileRepository.findByUPINotSettledData(time12PM, time12PM1));
-            countDtoList.add(countDto3);
+        countDto3.setStatus("UPI  Txn Count 12 PM - 1 PM");
+        countDto3.setSettled(atfFileRepository.findByUPISettledData(time12PM, time12PM1));
+        countDto3.setNotSettled(atfFileRepository.findByUPINotSettledData(time12PM, time12PM1));
+        countDtoList.add(countDto3);
 
-            UPICountDto countDto4 = new UPICountDto();
-            countDto4.setStatus("UPI  Txn Count 1 PM - 2 PM");
-            countDto4.setSettled(atfFileRepository.findByUPISettledData(time1PM, time1PM1));
-            countDto4.setNotSettled(atfFileRepository.findByUPINotSettledData(time1PM, time1PM1));
-            countDtoList.add(countDto4);
+        UPICountDto countDto4 = new UPICountDto();
+        countDto4.setStatus("UPI  Txn Count 1 PM - 2 PM");
+        countDto4.setSettled(atfFileRepository.findByUPISettledData(time1PM, time1PM1));
+        countDto4.setNotSettled(atfFileRepository.findByUPINotSettledData(time1PM, time1PM1));
+        countDtoList.add(countDto4);
 
-            UPICountDto countDto5 = new UPICountDto();
-            countDto5.setStatus("UPI  Txn Count 2 PM - 3 PM");
-            countDto5.setSettled(atfFileRepository.findByUPISettledData(time2PM, time2PM1));
-            countDto5.setNotSettled(atfFileRepository.findByUPINotSettledData(time2PM, time2PM1));
-            countDtoList.add(countDto5);
+        UPICountDto countDto5 = new UPICountDto();
+        countDto5.setStatus("UPI  Txn Count 2 PM - 3 PM");
+        countDto5.setSettled(atfFileRepository.findByUPISettledData(time2PM, time2PM1));
+        countDto5.setNotSettled(atfFileRepository.findByUPINotSettledData(time2PM, time2PM1));
+        countDtoList.add(countDto5);
 
-            UPICountDto countDto6 = new UPICountDto();
-            countDto6.setStatus("UPI  Txn Count 3 PM - 4 PM");
-            countDto6.setSettled(atfFileRepository.findByUPISettledData(time3PM, time3PM1));
-            countDto6.setNotSettled(atfFileRepository.findByUPINotSettledData(time3PM, time3PM1));
-            countDtoList.add(countDto6);
+        UPICountDto countDto6 = new UPICountDto();
+        countDto6.setStatus("UPI  Txn Count 3 PM - 4 PM");
+        countDto6.setSettled(atfFileRepository.findByUPISettledData(time3PM, time3PM1));
+        countDto6.setNotSettled(atfFileRepository.findByUPINotSettledData(time3PM, time3PM1));
+        countDtoList.add(countDto6);
 
 //        ReportUtil.generateAtfFileReportInTextFile(atf, Constants.COUNT, updatedAtfFile, atfFileSheet, addressesArr);
 
 
-
 //        }
-        List<String> headers = Arrays.asList("Status", "Settled","NotSettled");
+        List<String> headers = Arrays.asList("Status", "Settled", "NotSettled");
         File file = new File(updatedAtfFile);
-        ReportUtil.upiCountExcel(countDtoList, headers, atfFileSheet,file);
+        ReportUtil.upiCountExcel(countDtoList, headers, atfFileSheet, file);
 
-}
+    }
 
-//    @Override
-//    public void processMulipleData() {
-//        List<String> multipleData = atfFileRepository.findByMultipleData();
-//        multipleData.forEach(l->{
-//            List<AtfFileReport> data = atfFileRepository.findByData();
-//
-//        });
-//
-//    }
+
+    @Override
+    public ByteArrayOutputStream generatePdfFile() throws DocumentException, IOException {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        com.itextpdf.text.Document document = new Document();
+        document.setPageSize(PageSize.A4);
+        PdfWriter writer = PdfWriter.getInstance(document, byteArrayOutputStream);
+        writer.setFullCompression();
+        document.open();
+        PdfPTable pdfPTable = new PdfPTable(1);
+        pdfPTable.setWidthPercentage(100);
+        pdfPTable.setWidths(new float[]{1});
+        pdfPTable.setSpacingBefore(5);
+        pdfPTable.addCell(getHeaderCell("APPLICATION FORM"));
+
+        document.add(pdfPTable);
+
+        PdfPTable pdfPTable1 = new PdfPTable(3);
+        pdfPTable1.setWidthPercentage(100);
+        pdfPTable1.setWidths(new float[]{1.3f, 1.1f, 0.6f});
+        pdfPTable1.addCell(getRowCellWithoutBorder("Date of the Agreement :" + String.valueOf(DateUtil.currentDate("dd/MM/yyyy"))));
+        pdfPTable1.addCell(getRowCellWithoutBorder("Region :" + "Chennai"));
+
+        pdfPTable1.addCell(getRowCellWithoutBorder("Ver : " + DateUtil.currentDate("MM/yyyy")));
+        document.add(pdfPTable1);
+
+        PdfPTable pdfPTable3 = new PdfPTable(2);
+        pdfPTable3.setWidthPercentage(100);
+        pdfPTable3.setWidths(new float[]{1, 2});
+        pdfPTable3.addCell(getCellwithLeftAlignWithLeftBottomtBorderSize45("Legal Name ")); // legal name
+        pdfPTable3.addCell(getCellwithLeftAlignWithRightBottomtBorderSize45("Muthu"));
+        document.add(pdfPTable3);
+
+        PdfPTable pdfPTable4 = new PdfPTable(2);
+        pdfPTable4.setWidthPercentage(100);
+        pdfPTable4.setWidths(new float[]{1, 2});
+        pdfPTable4.addCell(getCellwithLeftAlignWithLeftBottomtBorderSize45("DBA Name ")); // dba name
+        pdfPTable4.addCell(getCellwithLeftAlignWithRightBottomtBorderSize45("Test"));
+
+        document.add(pdfPTable4);
+
+        PdfPTable pdfPTable5 = new PdfPTable(2);
+        pdfPTable5.setWidthPercentage(100);
+        pdfPTable5.setWidths(new float[]{1, 2});
+        pdfPTable5.addCell(getCellwithLeftAlignWithLeftBottomtBorderSize45("Registered Address ")); // address
+        pdfPTable5.addCell(getCellwithLeftAlignWithRightBottomtBorderSize45("Chennai"));
+        document.add(pdfPTable5);
+
+        PdfPTable pdfPTable6 = new PdfPTable(2);
+        pdfPTable6.setWidthPercentage(100);
+        pdfPTable6.setWidths(new float[]{1, 2});
+        pdfPTable6.addCell(getCellwithLeftAlignWithLeftBottomtBorderSize45("State "));
+        pdfPTable6.addCell(getCellwithLeftAlignWithRightBottomtBorderSize45("TamilNadu"));
+        document.add(pdfPTable6);
+        document.close();
+        byteArrayOutputStream.close();
+        return byteArrayOutputStream;
+
+    }
+
+    private static PdfPCell getHeaderCell(String text) {
+        com.itextpdf.text.Font font = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD);
+        FontSelector fontSelector = new FontSelector();
+        fontSelector.addFont(font);
+        Phrase phrase = fontSelector.process(text);
+        PdfPCell cell = new PdfPCell(phrase);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setPadding(5.0f);
+        cell.setBorderWidthBottom(0);
+        cell.setBorderWidthTop(0);
+        cell.setBorderWidthRight(0);
+        cell.setBorderWidthLeft(0);
+        return cell;
+    }
+
+    public static PdfPCell getRowCellWithoutBorder(String text) {
+        Font catFont = new Font(Font.FontFamily.TIMES_ROMAN, 8, Font.NORMAL);
+        FontSelector fs = new FontSelector();
+        fs.addFont(catFont);
+        Phrase phrase = fs.process(text);
+        PdfPCell cell = new PdfPCell(phrase);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setPadding(5.0f);
+        cell.setBorderWidthBottom(0);
+        cell.setBorderWidthTop(0);
+        cell.setBorderWidthRight(0);
+        cell.setBorderWidthLeft(0);
+        return cell;
+    }
+
+    private static PdfPCell getCellwithLeftAlignWithLeftBottomtBorderSize45(String text) {
+
+        Font catFont = new Font(Font.FontFamily.TIMES_ROMAN, 8, Font.NORMAL);
+        FontSelector fs = new FontSelector();
+        fs.addFont(catFont);
+        Phrase phrase = fs.process(text);
+        PdfPCell cell = new PdfPCell(phrase);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setPadding(5.0f);
+        cell.setBorderWidthTop(0);
+        cell.setBorderWidthRight(0);
+        return cell;
+    }
+
+    private static PdfPCell getCellwithLeftAlignWithRightBottomtBorderSize45(String text) {
+
+        Font catFont = new Font(Font.FontFamily.TIMES_ROMAN, 8, Font.NORMAL);
+        FontSelector fs = new FontSelector();
+        fs.addFont(catFont);
+        Phrase phrase = fs.process(text);
+        PdfPCell cell = new PdfPCell(phrase);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setPadding(4.0f);
+        cell.setBorderWidthTop(0);
+        return cell;
+    }
 
     public static File largestFile(File f) {
         if (f.isFile()) {
