@@ -12,6 +12,7 @@ import com.bijlipay.ATFFileGeneration.Util.DateUtil;
 import com.bijlipay.ATFFileGeneration.Util.JWEMainClient;
 import com.bijlipay.ATFFileGeneration.Util.MailHandler;
 import com.itextpdf.text.DocumentException;
+import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,7 +65,6 @@ public class AtfFileController {
 
     @Autowired
     private SwitchResponseRepository switchResponseRepository;
-
 
     @GetMapping("/upload-atf-file/{date}")
     public ResponseEntity<?> uploadAtfFile(@PathVariable("date") String date) throws Exception {
@@ -194,7 +194,7 @@ public class AtfFileController {
         File atf = new File(atfFile);
         boolean allTxnFileUpdated = false;
 //        if (atf.exists()) {
-            try {
+        try {
 
 
 //
@@ -207,13 +207,13 @@ public class AtfFileController {
 //                    logger.info("ATF File Data Removed Successfully ---");
 //                }
 //                mailHandler.sendReversalMail(date);
-                mailHandler.sendATFRuleDataMail(date);
+            mailHandler.sendATFRuleDataMail(date);
 //                logger.info("Reversal Data Mail send Successfully ---");
 ////                atfFileService.removeFile(date);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
 //        } else {
 //            return new ResponseEntity<>(new ApiResponse(HttpStatus.BAD_REQUEST, "Please upload the correct files"), HttpStatus.BAD_REQUEST);
 //        }
@@ -477,5 +477,30 @@ public class AtfFileController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(byteArrayOutputStream.toByteArray());
+    }
+
+
+    @GetMapping("/testing")
+    public ResponseEntity<?> Testing() {
+        logger.info("Testing ---");
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK, "Success"), HttpStatus.OK);
+    }
+
+    @GetMapping("generate-log_file")
+    public ResponseEntity<?>generateLogFile() throws IOException {
+        atfFileService.generateUpiLogFile();
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK,"Success"), HttpStatus.OK);
+    }
+
+    @GetMapping("publish-data")
+    public ResponseEntity<?>mqttPublishData() throws IOException, MqttException {
+        atfFileService.publishData();
+        return new ResponseEntity<>(new ApiResponse(HttpStatus.OK,"Success"), HttpStatus.OK);
+    }
+    
+    @GetMapping("/generate-charge-slip")
+    public ResponseEntity<?>generateChargeSlip(){
+        atfFileService.generateChargeSlip();
+        return new ResponseEntity(new ApiResponse(HttpStatus.OK,"Succes"),HttpStatus.OK);
     }
 }

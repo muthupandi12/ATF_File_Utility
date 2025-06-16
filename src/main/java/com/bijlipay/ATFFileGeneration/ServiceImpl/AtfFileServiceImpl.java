@@ -26,6 +26,10 @@ import com.opencsv.CSVWriter;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.net.ssl.*;
 import javax.swing.text.StyledEditorKit;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -3382,6 +3387,130 @@ public class AtfFileServiceImpl implements AtfFileService {
         return byteArrayOutputStream;
 
     }
+
+    @Override
+    public void generateUpiLogFile() throws IOException {
+
+        String inputFilePath = "D:\\UpiCallBackAPI_12_15.log";
+        String outputFilePath = "D:\\UpiOutput.txt";
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(inputFilePath));
+             BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
+            List<String> orderList = new ArrayList<>();
+            orderList.add("GTZ1077811220240528121444366");
+            orderList.add("GTZ2977549820240528121403831");
+            orderList.add("GTZ1677966920240528121451074");
+            String line;
+            while ((line = reader.readLine()) != null) {
+                boolean isHeaderWritten = false;
+                for (String l : orderList) {
+                    // Check if the line contains the word "orderid"
+                    if (line.contains(l)) {
+//                        if (!isHeaderWritten) {
+                            writer.write(l);
+                            writer.newLine();
+//                            isHeaderWritten = true;
+//                        }
+                        writer.newLine();
+                        writer.write(line);
+                        writer.newLine();
+
+                    }
+                }
+
+            }
+
+
+            System.out.println("Filtered data written to " + outputFilePath);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    MqttClient client =null;
+    @Override
+    public void publishData() throws MqttException {
+        String broker ="tcp://localhost:1883";
+        String clientId="Java";
+        String topic ="move";
+        client = new MqttClient(broker,clientId);
+        MqttConnectOptions options = new MqttConnectOptions();
+        options.setUserName("muthu");
+        options.setPassword("password".toCharArray());
+        client.connect(options);
+        logger.info("Client Connected -");
+        String message = "Hello java";
+        MqttMessage mqttMessage =new MqttMessage(message.getBytes());
+        mqttMessage.setQos(2);
+        client.publish(topic,mqttMessage);
+        logger.info("Data published");
+
+
+    }
+
+    @Override
+    public void generateChargeSlip() {
+        String inputFilePath = "D:\\charge_slip_log.txt";
+        String outputFilePath = "D:\\charge_slip_output.txt";
+
+        // Define the content to be filtered (for example, lines containing the word "Java")
+        String keyword = "Message Bytes with Length";
+        StringBuilder extractedContent = new StringBuilder();
+
+        // Create FileReader and BufferedReader to read the file
+        try (BufferedReader reader = new BufferedReader(new FileReader(inputFilePath));
+             BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                int keywordIndex =line.indexOf(keyword);
+                logger.info("Keyword Index --{}",keywordIndex+keyword.length()+3);
+                if(keywordIndex !=-1){
+                    String content =line.substring(keywordIndex+keyword.length()+3).trim();
+                    logger.info("Original Content --{}",content);
+                    logger.info("Original Content Index --{}",content.length());
+                    if(content.contains("9B02")){
+                        int tsiIndex =content.indexOf("9B02");
+                        logger.info("tsi Index --{}",tsiIndex);
+                       String tSIValue=content.substring(tsiIndex+4,tsiIndex+8).trim();
+                       writer.write("TSI Value "+tSIValue);
+                       writer.newLine();
+                       logger.info("tsi Value --{}",tSIValue);
+                    }
+                    if(content.contains("840")){
+                        int aidIndex = content.indexOf("840");
+                        logger.info("asi Index --{}",aidIndex);
+                        String aidValue=content.substring(aidIndex+4,aidIndex+18).trim();
+                        writer.write("AID Value "+aidValue);
+                        writer.newLine();
+                        logger.info("aid Value --{}",aidValue);
+                    }
+                    if(content.contains("9505")){
+                        int tvrIndex = content.indexOf("9505");
+                        logger.info("tvr Index --{}",tvrIndex);
+                        String tvrValue=content.substring(tvrIndex+4,tvrIndex+14).trim();
+                        writer.write("TVR Value "+tvrValue);
+                        writer.newLine();
+                        logger.info("TVR Value --{}",tvrValue);
+                    }
+                    if(content.contains("9F26")){
+                        int cryptoIndex = content.indexOf("9F26");
+                        logger.info("crypto Index --{}",cryptoIndex);
+                        String cryptoValue=content.substring(cryptoIndex+4,cryptoIndex+20).trim();
+                        writer.write("Crypto Value "+cryptoValue);
+                        writer.newLine();
+                        logger.info("Crypto Value --{}",cryptoValue);
+                    }
+                }
+            }
+
+            System.out.println("Filtered content has been written to " + outputFilePath);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
 
     private static PdfPCell getHeaderCell(String text) {
         com.itextpdf.text.Font font = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD);

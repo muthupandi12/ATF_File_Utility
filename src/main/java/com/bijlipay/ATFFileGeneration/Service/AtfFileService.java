@@ -4,6 +4,7 @@ import com.bijlipay.ATFFileGeneration.Model.AtfFileReport;
 import com.bijlipay.ATFFileGeneration.Model.Dto.AxisDto;
 import com.itextpdf.text.DocumentException;
 import com.nimbusds.jose.JOSEException;
+import org.eclipse.paho.client.mqttv3.MqttException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.bijlipay.ATFFileGeneration.Model.AtfFileDTO;
@@ -115,6 +116,12 @@ public interface AtfFileService {
 
 
     ByteArrayOutputStream generatePdfFile() throws DocumentException, IOException;
+
+    void generateUpiLogFile() throws IOException;
+
+    void publishData() throws MqttException;
+
+    void generateChargeSlip();
 
 //    void processMulipleData();
 }
